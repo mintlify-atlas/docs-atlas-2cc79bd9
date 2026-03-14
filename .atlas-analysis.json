@@ -1,0 +1,105 @@
+{
+  "projectType": "saas",
+  "projectName": "Kids&Us App Versions",
+  "projectDescription": "A comprehensive dashboard for tracking Kids&Us application versions across multiple app stores",
+  "theme": "almond",
+  "primaryColor": "#e64c64",
+  "lightColor": "#04545b",
+  "darkColor": "#d8836c",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "deployment"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/dashboard",
+              "features/version-tracking",
+              "features/data-refresh",
+              "features/theme-switching"
+            ]
+          },
+          {
+            "group": "Admin Features",
+            "pages": [
+              "admin/force-update",
+              "admin/rate-limits"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "API Endpoints",
+            "pages": [
+              "api/data",
+              "api/update"
+            ]
+          },
+          {
+            "group": "Scrapers",
+            "pages": [
+              "api/scrapers/overview",
+              "api/scrapers/app-store",
+              "api/scrapers/google-play",
+              "api/scrapers/microsoft-store",
+              "api/scrapers/huawei"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Development",
+        "groups": [
+          {
+            "group": "Development",
+            "pages": [
+              "development/setup",
+              "development/project-structure",
+              "development/testing",
+              "development/contributing"
+            ]
+          },
+          {
+            "group": "Components",
+            "pages": [
+              "development/components/ui-components",
+              "development/components/dashboard-table",
+              "development/components/version-badge"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-store version tracking (Google Play, App Store, Microsoft Store, Huawei AppGallery)",
+    "Real-time data refresh with rate limiting",
+    "Light/dark theme switching",
+    "Admin key for bypassing cooldowns",
+    "Responsive dashboard interface",
+    "RESTful API endpoints",
+    "Zod schema validation for external data"
+  ],
+  "publicApiSurface": [
+    "GET /api/data - Retrieve current app version data",
+    "POST /api/update - Trigger data refresh from app stores",
+    "AppStoreScraper - iTunes App Store scraper",
+    "GooglePlayScraper - Google Play Store scraper",
+    "MicrosoftStoreScraper - Microsoft Store scraper",
+    "HuaweiScraper - Huawei AppGallery scraper",
+    "ScraperFactory - Factory for creating store scrapers",
+    "ScraperService - Service for orchestrating scraping operations"
+  ]
+}
