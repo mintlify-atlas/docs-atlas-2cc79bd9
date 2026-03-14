@@ -1,0 +1,378 @@
+---
+title: 'DashboardTable Component'
+description: 'Main table component for displaying app version data across multiple stores'
+icon: 'table'
+---
+
+## Overview
+
+The `DashboardTable` component is the core component responsible for displaying app version information in a structured, responsive table format. It handles both desktop (table view) and mobile (card view) layouts, and includes loading states with skeleton placeholders.
+
+**Location**: `src/components/DashboardTable.tsx`
+
+## Purpose
+
+The DashboardTable component:
+
+- Displays app version data for multiple apps and stores
+- Provides a responsive design (table for desktop, cards for mobile)
+- Shows app icons, names, store links, versions, and last update dates
+- Includes loading states with skeleton UI
+- Integrates with VersionBadge for version display
+
+## Props
+
+<ParamField path="apps" type="App[]" required>
+  Array of app objects containing app and store information. Each app includes:
+  - `id`: Unique identifier
+  - `name`: App name
+  - `orderId`: Display order
+  - `icon`: App icon URL
+  - `stores`: Array of store objects with version data
+</ParamField>
+
+<ParamField path="isLoading" type="boolean" required>
+  Loading state indicator. When `true`, displays skeleton placeholders instead of actual data.
+</ParamField>
+
+## TypeScript Interface
+
+```tsx src/components/DashboardTable.tsx
+interface DashboardTableProps {
+  apps: App[];
+  isLoading: boolean;
+}
+```
+
+### App Type
+
+```tsx src/lib/types.ts
+interface App {
+  id: string;
+  name: string;
+  orderId: number;
+  icon: string;
+  stores: Store[];
+}
+```
+
+### Store Type
+
+```tsx src/lib/types.ts
+interface Store {
+  id: string;
+  name: string;
+  version: string;
+  lastUpdateDate: string;
+  url: string;
+  error?: string;
+}
+```
+
+## Implementation Details
+
+### Data Structure
+
+The component consumes a hierarchical data structure:
+
+```tsx
+const apps: App[] = [
+  {
+    id: 'app-1',
+    name: 'Kids&Us App',
+    orderId: 1,
+    icon: 'https://example.com/icon.png',
+    stores: [
+      {
+        id: 'store-1',
+        name: 'App Store',
+        version: '1.2.3',
+        lastUpdateDate: '2024-03-14',
+        url: 'https://apps.apple.com/...',
+      },
+      {
+        id: 'store-2',
+        name: 'Google Play',
+        version: '1.2.3',
+        lastUpdateDate: '2024-03-14',
+        url: 'https://play.google.com/...',
+      },
+    ],
+  },
+];
+```
+
+### Table Structure
+
+The desktop table has four columns:
+
+1. **Application** (40% width): App icon and name
+2. **Store** (25% width): Store name as clickable link
+3. **Version** (15% width): Version number in a badge
+4. **Last Update** (20% width): Date of last update
+
+```tsx src/components/DashboardTable.tsx
+<TableHeader className="bg-muted">
+  <TableRow className="hover:bg-transparent">
+    <TableHead className="h-10 w-[40%] px-3 py-2 text-[0.75rem] font-semibold">
+      Application
+    </TableHead>
+    <TableHead className="h-10 w-[25%] px-3 py-2 text-[0.75rem] font-semibold">
+      Store
+    </TableHead>
+    <TableHead className="h-10 w-[15%] px-3 py-2 text-[0.75rem] font-semibold">
+      Version
+    </TableHead>
+    <TableHead className="h-10 w-[20%] px-3 py-2 text-[0.75rem] font-semibold">
+      Last Update
+    </TableHead>
+  </TableRow>
+</TableHeader>
+```
+
+### Responsive Design
+
+The component uses Tailwind's responsive utilities to show different layouts:
+
+- **Mobile** (`md:hidden`): Card-based layout with vertical information stacking
+- **Desktop** (`hidden md:block`): Traditional table layout
+
+```tsx
+<div className="space-y-4">
+  {/* Mobile Card View */}
+  <div className="space-y-4 md:hidden">
+    {/* Card layout */}
+  </div>
+
+  {/* Desktop Table View */}
+  <div className="hidden md:block">
+    {/* Table layout */}
+  </div>
+</div>
+```
+
+### Row Spanning
+
+The component uses `rowSpan` to merge cells for apps with multiple stores:
+
+```tsx src/components/DashboardTable.tsx
+{index === 0 && (
+  <TableCell rowSpan={app.stores.length} className="px-3 py-2.5 align-top">
+    <div className="flex items-start gap-2">
+      {/* App icon and name */}
+    </div>
+  </TableCell>
+)}
+```
+
+This creates a visual grouping where the app name/icon spans multiple rows (one per store).
+
+### Icon Handling
+
+The component includes fallback handling for app icons:
+
+```tsx src/components/DashboardTable.tsx
+{app.icon ? (
+  <Image
+    src={app.icon}
+    alt={app.name}
+    width={24}
+    height={24}
+    className="app-icon"
+    unoptimized
+    onError={(e) => (e.currentTarget.style.display = 'none')}
+  />
+) : (
+  <div className="app-icon bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold">
+    {app.name.charAt(0)}
+  </div>
+)}
+```
+
+### Version Display
+
+Versions are displayed using the `VersionBadge` component with special handling for missing versions:
+
+```tsx src/components/DashboardTable.tsx
+{store.version !== 'N/A' ? (
+  <VersionBadge
+    version={store.version}
+    className="rounded-[calc(var(--radius)-2px)] px-2 py-0.5 font-mono text-[0.6875rem]"
+  />
+) : (
+  <span className="text-muted-foreground text-[0.6875rem] italic">N/A</span>
+)}
+```
+
+## Usage Examples
+
+### Basic Usage
+
+```tsx page.tsx
+import { DashboardTable } from '@/components/DashboardTable';
+import { App } from '@/lib/types';
+
+function Dashboard() {
+  const [apps, setApps] = useState<App[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchApps().then((data) => {
+      setApps(data.apps);
+      setIsLoading(false);
+    });
+  }, []);
+
+  return <DashboardTable apps={apps} isLoading={isLoading} />;
+}
+```
+
+### With Data Fetching
+
+```tsx
+'use client';
+
+import { useState, useEffect } from 'react';
+import { DashboardTable } from '@/components/DashboardTable';
+import { DashboardData } from '@/lib/types';
+
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/dashboard');
+      const dashboardData = await response.json();
+      setData(dashboardData);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  return (
+    <DashboardTable
+      apps={data?.apps || []}
+      isLoading={isLoading}
+    />
+  );
+}
+```
+
+## Loading State
+
+The component includes a comprehensive `TableSkeleton` component that displays placeholder content during loading:
+
+```tsx src/components/DashboardTable.tsx
+function TableSkeleton() {
+  return (
+    <div className="space-y-4">
+      {/* Mobile skeleton */}
+      <div className="space-y-4 md:hidden">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="border-muted overflow-hidden shadow-sm">
+            <div className="bg-muted/30 flex items-center gap-3 px-4 py-3">
+              <Skeleton className="h-8 w-8 rounded-md" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            {/* More skeleton content */}
+          </Card>
+        ))}
+      </div>
+
+      {/* Desktop skeleton */}
+      <div className="hidden md:block">
+        {/* Skeleton table rows */}
+      </div>
+    </div>
+  );
+}
+```
+
+The skeleton automatically shows:
+- 4 card placeholders on mobile
+- 8 table row placeholders on desktop
+- Skeleton components for icons, text, and badges
+
+## Styling
+
+The component uses a combination of Tailwind utility classes:
+
+- **Responsive breakpoints**: `md:hidden`, `hidden md:block`
+- **Spacing**: `space-y-4`, `gap-2`, `px-3`, `py-2.5`
+- **Colors**: `bg-muted`, `text-foreground`, `border-muted`
+- **Typography**: `text-[0.75rem]`, `font-semibold`, `font-mono`
+- **Hover states**: `hover:bg-muted/50`, `hover:underline`
+- **Transitions**: `transition-colors`
+
+## Accessibility
+
+ The component includes several accessibility features:
+
+- **ARIA labels**: Store links include descriptive `aria-label` attributes
+  ```tsx
+  <a aria-label={`${store.name} for ${app.name}`}>
+  ```
+- **Semantic HTML**: Uses proper table elements (`<table>`, `<thead>`, `<tbody>`, etc.)
+- **Alt text**: Images include alt text with app names
+- **Keyboard navigation**: All interactive elements are keyboard accessible
+
+## Dependencies
+
+The DashboardTable component depends on:
+
+- **Next.js Image**: For optimized image loading
+- **Shadcn/ui components**: Table, Card, Skeleton
+- **VersionBadge**: Custom component for version display
+- **Type definitions**: App and Store types from `@/lib/types`
+
+```tsx src/components/DashboardTable.tsx
+import Image from 'next/image';
+import { App } from '@/lib/types';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { VersionBadge } from '@/components/VersionBadge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+```
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="Image Optimization">
+    Uses Next.js `Image` component with `unoptimized` flag for external images. The `onError` handler hides broken images gracefully.
+  </Accordion>
+
+  <Accordion title="Conditional Rendering">
+    Only renders the necessary layout (mobile or desktop) based on screen size, improving performance on both platforms.
+  </Accordion>
+
+  <Accordion title="Skeleton Loading">
+    Provides immediate visual feedback during loading, improving perceived performance.
+  </Accordion>
+
+  <Accordion title="Key Optimization">
+    Uses composite keys (`${app.id}-${store.id}`) for React list rendering to prevent unnecessary re-renders.
+  </Accordion>
+</AccordionGroup>
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="VersionBadge" icon="tag" href="./version-badge">
+    Badge component used for displaying version numbers
+  </Card>
+  <Card title="UI Components" icon="palette" href="./ui-components">
+    Shadcn/ui components used in the table
+  </Card>
+  <Card title="Data Refresh" icon="rotate" href="/features/data-refresh">
+    Learn about the data update mechanism
+  </Card>
+  <Card title="API Documentation" icon="code" href="/api/data">
+    API endpoint documentation
+  </Card>
+</CardGroup>

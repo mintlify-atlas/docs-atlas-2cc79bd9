@@ -1,0 +1,330 @@
+---
+title: 'Microsoft Store Scraper'
+description: 'Microsoft Store API integration for fetching Windows app version data'
+icon: 'microsoft'
+---
+
+## Overview
+
+The `MicrosoftStoreScraper` fetches app version information from the Microsoft Store using an internal API endpoint. This scraper uses API-based extraction (similar to App Store) rather than HTML scraping.
+
+**File Location**: `src/lib/scrapers/microsoft-store.ts`
+
+## Implementation
+
+```typescript src/lib/scrapers/microsoft-store.ts
+import { IScraper, ScrapeResult, StoreConfig } from './types';
+import { formatDate } from '../utils/date';
+import { MicrosoftStoreResponseSchema } from '../schemas';
+
+export class MicrosoftStoreScraper implements IScraper {
+  async scrape(config: StoreConfig): Promise<ScrapeResult> {
+    const productId = config.productId;
+    if (!productId) throw new Error('Missing productId');
+
+    const apiUrl = `https://apps.microsoft.com/api/ProductsDetails/GetProductDetailsById/${productId}?gl=ES&hl=es-ES`;
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const json = await response.json();
+    const parsed = MicrosoftStoreResponseSchema.safeParse(json);
+
+    if (!parsed.success) {
+      console.error('Microsoft API schema validation failed:', parsed.error);
+      throw new Error('Invalid Microsoft Store API response structure');
+    }
+
+    const data = parsed.data;
+    let version = 'N/A';
+
+    if (data.installer?.architectures) {
+      const architectures = Object.values(data.installer.architectures);
+      if (architectures.length > 0 && architectures[0].version) {
+        version = architectures[0].version;
+      }
+    }
+
+    return {
+      version,
+      lastUpdateDate: data.packageLastUpdateDateUtc
+        ? formatDate(data.packageLastUpdateDateUtc)
+        : 'N/A',
+      icon: data.iconUrl || '',
+    };
+  }
+}
+```
+
+## How It Works
+
+### 1. Configuration
+
+The scraper requires a `productId` (Microsoft's product identifier) in the `StoreConfig`:
+
+```typescript
+const config: StoreConfig = {
+  id: 'windows-app',
+  type: 'microsoft',
+  productId: '9NKSQGP7F2NH' // Required: Microsoft product ID
+};
+```
+
+### 2. API Endpoint
+
+The scraper uses Microsoft's internal product details API:
+
+```
+https://apps.microsoft.com/api/ProductsDetails/GetProductDetailsById/{productId}?gl=ES&hl=es-ES
+```
+
+**Query Parameters**:
+- `gl=ES`: Geographic location (Spain)
+- `hl=es-ES`: Language/locale (Spanish - Spain)
+
+<Info>
+  The locale parameters (`gl` and `hl`) can be adjusted based on your target market. They affect regional availability and pricing data but typically don't impact version numbers.
+</Info>
+
+**Example**: `https://apps.microsoft.com/api/ProductsDetails/GetProductDetailsById/9NKSQGP7F2NH?gl=ES&hl=es-ES`
+
+### 3. API Response Structure
+
+The Microsoft API returns a complex JSON structure with app metadata:
+
+```json
+{
+  "installer": {
+    "architectures": {
+      "x64": {
+        "version": "3.2.1.0",
+        "fileSize": 125829120,
+        // ... other fields
+      },
+      "arm64": {
+        "version": "3.2.1.0",
+        // ...
+      }
+    }
+  },
+  "packageLastUpdateDateUtc": "2024-01-15T10:30:00Z",
+  "iconUrl": "https://store-images.s-microsoft.com/image/apps.12345.png",
+  "title": "App Name",
+  "description": "...",
+  // ... many other fields
+}
+```
+
+### 4. Schema Validation
+
+The scraper validates the response using Zod to ensure type safety:
+
+```typescript src/lib/schemas.ts
+export const MicrosoftStoreResponseSchema = z.object({
+  installer: z
+    .object({
+      architectures: z.record(
+        z.string(), // Architecture name (e.g., "x64", "arm64")
+        z.object({
+          version: z.string().optional(),
+        })
+      ),
+    })
+    .optional(),
+  packageLastUpdateDateUtc: z.string().optional(),
+  iconUrl: z.string().optional(),
+});
+```
+
+<Accordion title="Why is everything optional?">
+  All fields are marked as optional because:
+  - Different app types may have different response structures
+  - Some apps might not have installer information
+  - API responses may evolve over time
+  - This allows graceful degradation (returning 'N/A' instead of crashing)
+</Accordion>
+
+### 5. Version Extraction from Architectures
+
+Microsoft Store apps can support multiple CPU architectures (x64, x86, ARM64). The scraper extracts the version from the first available architecture:
+
+```typescript
+let version = 'N/A';
+
+if (data.installer?.architectures) {
+  const architectures = Object.values(data.installer.architectures);
+  if (architectures.length > 0 && architectures[0].version) {
+    version = architectures[0].version;
+  }
+}
+```
+
+**Example architecture object**:
+```json
+{
+  "x64": { "version": "3.2.1.0" },
+  "arm64": { "version": "3.2.1.0" }
+}
+```
+
+<Info>
+  Typically, all architectures have the same version number, so extracting from the first one is sufficient.
+</Info>
+
+### 6. Data Extraction
+
+The scraper extracts three key pieces of information:
+
+<CodeGroup>
+
+```typescript Version
+version: architectures[0].version || 'N/A'
+// Extracted from first architecture
+```
+
+```typescript Last Update Date
+lastUpdateDate: data.packageLastUpdateDateUtc
+  ? formatDate(data.packageLastUpdateDateUtc)
+  : 'N/A'
+// ISO 8601 → DD/MM/YYYY
+```
+
+```typescript App Icon
+icon: data.iconUrl || ''
+// Direct URL to Microsoft CDN
+```
+
+</CodeGroup>
+
+## Error Handling
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Missing `productId` | Throws `"Missing productId"` |
+| HTTP error | Throws `"HTTP {status}"` |
+| Invalid schema | Logs error and throws `"Invalid Microsoft Store API response structure"` |
+| Missing installer data | Returns `'N/A'` for version |
+| Missing date | Returns `'N/A'` for lastUpdateDate |
+| Missing icon | Returns empty string |
+
+```typescript
+try {
+  const scraper = new MicrosoftStoreScraper();
+  const result = await scraper.scrape({
+    id: 'whatsapp-desktop',
+    type: 'microsoft',
+    productId: '9NKSQGP7F2NH'
+  });
+  
+  console.log(result);
+  // { 
+  //   version: "3.2.1.0", 
+  //   lastUpdateDate: "15/01/2024", 
+  //   icon: "https://store-images.s-microsoft.com/..." 
+  // }
+} catch (error) {
+  console.error('Scraping failed:', error.message);
+}
+```
+
+## Date Formatting
+
+The Microsoft API returns ISO 8601 dates which are formatted to `DD/MM/YYYY`:
+
+```typescript
+// Input: "2024-01-15T10:30:00Z"
+// Output: "15/01/2024"
+
+formatDate(data.packageLastUpdateDateUtc)
+```
+
+## Icon URLs
+
+The Microsoft Store provides direct CDN URLs for app icons:
+
+```typescript
+icon: data.iconUrl || ''
+// Example: "https://store-images.s-microsoft.com/image/apps.12345.14b4e7c3-abcd-1234.png"
+```
+
+These URLs:
+- Point to Microsoft's CDN (store-images.s-microsoft.com)
+- Are publicly accessible without authentication
+- Typically in PNG format
+- Various sizes available (the API returns the standard size)
+
+## Usage Example
+
+```typescript
+import { MicrosoftStoreScraper } from './lib/scrapers/microsoft-store';
+
+const scraper = new MicrosoftStoreScraper();
+
+const result = await scraper.scrape({
+  id: 'whatsapp-windows',
+  type: 'microsoft',
+  productId: '9NKSQGP7F2NH'
+});
+
+console.log(result);
+// {
+//   version: "3.2.1.0",
+//   lastUpdateDate: "15/01/2024",
+//   icon: "https://store-images.s-microsoft.com/image/apps.12345.png"
+// }
+```
+
+## Finding Product IDs
+
+Microsoft product IDs can be found in the Microsoft Store URL:
+
+```
+https://apps.microsoft.com/detail/9NKSQGP7F2NH
+                                 ^^^^^^^^^^^^^
+                                 Product ID
+```
+
+Or in the longer URL format:
+
+```
+https://apps.microsoft.com/store/detail/whatsapp/9NKSQGP7F2NH
+                                                   ^^^^^^^^^^^^^
+                                                   Product ID
+```
+
+**Product ID format**: Always starts with `9` and contains uppercase alphanumeric characters (12 characters total).
+
+## Architecture Handling
+
+Microsoft Store apps can support multiple CPU architectures:
+
+- **x64**: 64-bit Intel/AMD processors
+- **x86**: 32-bit Intel/AMD processors  
+- **ARM64**: ARM-based processors (Surface Pro X, etc.)
+- **Neutral**: Universal packages that work on all architectures
+
+```json
+{
+  "architectures": {
+    "x64": { "version": "3.2.1.0" },
+    "x86": { "version": "3.2.1.0" },
+    "arm64": { "version": "3.2.1.0" }
+  }
+}
+```
+
+The scraper simply uses the first architecture's version, as they typically match.
+
+## Related Scrapers
+
+<CardGroup cols={2}>
+  <Card title="App Store Scraper" icon="apple" href="/api/scrapers/app-store">
+    iOS/macOS app version scraping
+  </Card>
+  <Card title="Huawei Scraper" icon="mobile" href="/api/scrapers/huawei">
+    AppGallery version scraping
+  </Card>
+  <Card title="Scraper Overview" icon="arrow-left" href="/api/scrapers/overview">
+    Back to architecture overview
+  </Card>
+</CardGroup>

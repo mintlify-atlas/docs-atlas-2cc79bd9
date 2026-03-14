@@ -1,0 +1,231 @@
+---
+title: 'GET /api/data'
+description: 'Retrieve app version data for all tracked applications'
+---
+
+## Overview
+
+The `/api/data` endpoint returns the current app version information for all tracked Kids&Us applications across multiple app stores.
+
+## Request
+
+<ParamField query="method" type="string" default="GET">
+  HTTP method for this endpoint
+</ParamField>
+
+### Endpoint
+
+```
+GET /api/data
+```
+
+No authentication or request parameters are required.
+
+## Response
+
+Returns a JSON object containing the last update timestamp and an array of all tracked applications with their store versions.
+
+### Response Schema
+
+<ResponseField name="lastUpdate" type="string" required>
+  ISO 8601 timestamp of when the data was last updated
+</ResponseField>
+
+<ResponseField name="apps" type="array" required>
+  Array of application objects
+  
+  <Expandable title="App Object">
+    <ResponseField name="id" type="string" required>
+      Unique identifier for the application
+    </ResponseField>
+    
+    <ResponseField name="name" type="string" required>
+      Display name of the application
+    </ResponseField>
+    
+    <ResponseField name="orderId" type="number" required>
+      Sort order for display purposes
+    </ResponseField>
+    
+    <ResponseField name="icon" type="string" required>
+      URL to the application icon image
+    </ResponseField>
+    
+    <ResponseField name="stores" type="array" required>
+      Array of store version information
+      
+      <Expandable title="Store Object">
+        <ResponseField name="id" type="string" required>
+          Store identifier (e.g., `google-play`, `app-store-ios`, `ms-store`, `appgallery`)
+        </ResponseField>
+        
+        <ResponseField name="name" type="string" required>
+          Display name of the store
+        </ResponseField>
+        
+        <ResponseField name="version" type="string" required>
+          Current version number in this store
+        </ResponseField>
+        
+        <ResponseField name="lastUpdateDate" type="string" required>
+          Date of last update in DD/MM/YYYY format
+        </ResponseField>
+        
+        <ResponseField name="url" type="string" required>
+          Direct URL to the app listing in the store
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl https://your-domain.com/api/data
+```
+
+```javascript JavaScript
+const response = await fetch('https://your-domain.com/api/data');
+const data = await response.json();
+
+console.log('Last updated:', data.lastUpdate);
+console.log('Apps:', data.apps);
+```
+
+```typescript TypeScript
+interface Store {
+  id: string;
+  name: string;
+  version: string;
+  lastUpdateDate: string;
+  url: string;
+}
+
+interface App {
+  id: string;
+  name: string;
+  orderId: number;
+  icon: string;
+  stores: Store[];
+}
+
+interface DataResponse {
+  lastUpdate: string;
+  apps: App[];
+}
+
+const response = await fetch('https://your-domain.com/api/data');
+const data: DataResponse = await response.json();
+```
+
+```python Python
+import requests
+
+response = requests.get('https://your-domain.com/api/data')
+data = response.json()
+
+print(f"Last updated: {data['lastUpdate']}")
+print(f"Number of apps: {len(data['apps'])}")
+```
+
+</CodeGroup>
+
+### Success Response (200)
+
+```json
+{
+  "lastUpdate": "2026-03-13T15:57:12.537Z",
+  "apps": [
+    {
+      "id": "mykids",
+      "name": "MyKids",
+      "orderId": 1,
+      "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/5a/c1/31/5ac13148-179b-4340-a5c5-81ccb86b9686/AppIcon-0-0-1x_U007emarketing-0-11-0-85-220.png/512x512bb.jpg",
+      "stores": [
+        {
+          "id": "google-play",
+          "name": "Google Play",
+          "version": "1.3.9",
+          "lastUpdateDate": "10/02/2026",
+          "url": "https://play.google.com/store/apps/details?id=es.kidsandus.mykids"
+        },
+        {
+          "id": "app-store-ios",
+          "name": "App Store iOS",
+          "version": "1.3.9",
+          "lastUpdateDate": "12/02/2026",
+          "url": "https://apps.apple.com/app/id1435773819"
+        }
+      ]
+    },
+    {
+      "id": "ppbb",
+      "name": "P&P and B&B",
+      "orderId": 3,
+      "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/a3/fb/b7/a3fbb720-69ed-dbd9-9bf5-8f290b7b6e03/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/512x512bb.jpg",
+      "stores": [
+        {
+          "id": "ms-store",
+          "name": "Microsoft Store",
+          "version": "1.1.2",
+          "lastUpdateDate": "13/01/2026",
+          "url": "https://apps.microsoft.com/detail/xp9m1b7t3zd4lt"
+        },
+        {
+          "id": "google-play",
+          "name": "Google Play",
+          "version": "1.1.2",
+          "lastUpdateDate": "09/01/2026",
+          "url": "https://play.google.com/store/apps/details?id=com.kidsandus.myway.ppbb.pro"
+        },
+        {
+          "id": "appgallery",
+          "name": "Huawei AppGallery",
+          "version": "1.1.2",
+          "lastUpdateDate": "13/01/2026",
+          "url": "https://appgallery.huawei.com/app/C114967515"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Error Response (404)
+
+Returned when no data is available in the system.
+
+```json
+{
+  "error": "Data not found"
+}
+```
+
+### Error Response (500)
+
+Returned when an internal server error occurs.
+
+```json
+{
+  "error": "Internal server error"
+}
+```
+
+## Status Codes
+
+| Status Code | Description |
+|-------------|-------------|
+| 200 | Success - Returns app version data |
+| 404 | Data not found - No data available |
+| 500 | Internal server error |
+
+## Use Cases
+
+- Display current app versions in the dashboard
+- Monitor version consistency across stores
+- Track when apps were last updated
+- Generate version reports
+- Integration with CI/CD pipelines

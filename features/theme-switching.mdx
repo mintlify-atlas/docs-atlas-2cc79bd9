@@ -1,0 +1,257 @@
+---
+title: 'Theme Switching'
+description: 'Switch between light and dark themes with persistent preferences'
+icon: 'circle-half-stroke'
+---
+
+## Overview
+
+The Kids&Us App Versions dashboard supports both light and dark color themes, allowing you to choose the appearance that works best for your environment and preferences.
+
+## Switching Themes
+
+### Theme Toggle Button
+
+The theme toggle is located in the top-right corner of the header:
+
+1. **Find the toggle**: Look for the sun/moon icon button in the header
+2. **Click to switch**: Click once to toggle between light and dark mode
+3. **Instant feedback**: The theme changes immediately across the entire dashboard
+
+### Theme Icons
+
+The button shows different icons depending on the current theme:
+
+<CardGroup cols={2}>
+  <Card title="Light Mode" icon="sun">
+    Shows a **Sun icon** when light mode is active
+  </Card>
+  <Card title="Dark Mode" icon="moon">
+    Shows a **Moon icon** when dark mode is active
+  </Card>
+</CardGroup>
+
+<Note>
+  The icon represents the *current* theme, not the theme you'll switch to.
+</Note>
+
+## Theme Persistence
+
+### Saving Your Preference
+
+Your theme choice is automatically saved:
+
+- **Local Storage**: Theme preference is stored in browser localStorage
+- **Persistent**: Your choice is remembered between sessions
+- **Per Browser**: Each browser/device maintains its own preference
+
+<CodeGroup>
+```typescript Storage Key
+localStorage.getItem('theme') // 'light' | 'dark'
+localStorage.setItem('theme', newTheme)
+```
+</CodeGroup>
+
+### Initial Load
+
+When you visit the dashboard:
+
+1. The system checks localStorage for a saved theme preference
+2. If found, that theme is applied immediately
+3. If not found, the default light theme is used
+4. No flash of unstyled content occurs
+
+<Tip>
+  The theme is applied before the page renders to prevent theme flashing.
+</Tip>
+
+## Visual Differences
+
+### Light Mode
+
+The light theme features:
+
+- **Background**: White/light gray
+- **Text**: Dark gray/black for high contrast
+- **Cards**: Subtle borders with light backgrounds
+- **Table rows**: Light hover effects
+- **Badges**: Gray secondary styling
+
+### Dark Mode
+
+The dark theme features:
+
+- **Background**: Dark gray/near-black
+- **Text**: Light gray/white for readability
+- **Cards**: Darker backgrounds with subtle borders
+- **Table rows**: Dark hover effects
+- **Badges**: Darker secondary styling with light text
+
+### Component Adaptations
+
+All UI components adapt to the selected theme:
+
+<CardGroup cols={2}>
+  <Card title="Header" icon="bars">
+    Backdrop blur with theme-aware background
+  </Card>
+  <Card title="Table" icon="table">
+    Background, borders, and hover states adjust
+  </Card>
+  <Card title="Buttons" icon="hand-pointer">
+    Variant colors adapt to theme
+  </Card>
+  <Card title="Progress Bar" icon="chart-line">
+    Indicator and background colors change
+  </Card>
+  <Card title="Version Badges" icon="tag">
+    Secondary variant uses theme colors
+  </Card>
+  <Card title="Toast Notifications" icon="message">
+    Background and text adapt to theme
+  </Card>
+</CardGroup>
+
+## Theme Implementation
+
+### CSS Variables
+
+The dashboard uses CSS custom properties for theming:
+
+- Light and dark color palettes defined
+- Components reference these variables
+- Switching themes updates the CSS class on `<html>`
+
+### Dark Class
+
+The dark theme is activated by adding a class:
+
+```html
+<!-- Light Mode -->
+<html class="">
+
+<!-- Dark Mode -->
+<html class="dark">
+```
+
+All components check for the `.dark` class to apply appropriate styles.
+
+## Accessibility
+
+### High Contrast
+
+Both themes maintain high contrast ratios:
+
+- Text meets WCAG AA standards for readability
+- Interactive elements have clear focus states
+- Color is not the only indicator of state
+
+### Reduced Motion
+
+The theme transition respects user preferences:
+
+- Instant theme switching (no animation)
+- Components update immediately
+- No jarring transitions
+
+### Screen Readers
+
+The theme toggle is accessible:
+
+```html
+<button aria-label="Toggle theme">
+  <!-- Icon -->
+</button>
+```
+
+- Clear ARIA label for screen readers
+- Proper button semantics
+- Keyboard accessible (Tab + Enter/Space)
+
+<Note>
+  The theme toggle is a standard button that works with all assistive technologies.
+</Note>
+
+## User Preferences
+
+### Browser Settings
+
+While the dashboard doesn't automatically detect system theme preferences, you can:
+
+1. Manually set your preferred theme on first visit
+2. The choice persists across sessions
+3. Change it anytime with one click
+
+### Multiple Devices
+
+Theme preferences are device-specific:
+
+- Each browser stores its own theme choice
+- You can use light mode on desktop and dark mode on mobile
+- Preferences don't sync between devices
+
+## Best Practices
+
+### When to Use Light Mode
+
+- **Bright environments**: Offices with good lighting
+- **Daytime use**: Morning and afternoon work
+- **Print-friendly**: Light backgrounds print better
+- **Detailed comparison**: Easier to spot subtle differences
+
+### When to Use Dark Mode
+
+- **Low-light environments**: Evening or dimly lit rooms
+- **Reduced eye strain**: Some users find dark mode more comfortable
+- **OLED displays**: Dark mode saves battery on OLED screens
+- **Personal preference**: Many users simply prefer dark interfaces
+
+<Tip>
+  Try both themes to see which one works best for your viewing conditions and personal comfort.
+</Tip>
+
+## Technical Details
+
+### Component Structure
+
+The ThemeToggle component is simple and lightweight:
+
+- **State**: Tracks current theme (`'light'` | `'dark'`)
+- **Effect**: Loads saved preference on mount
+- **Handler**: Toggles theme and saves to localStorage
+- **Render**: Shows appropriate icon based on current theme
+
+### DOM Updates
+
+When switching themes:
+
+1. State updates to new theme value
+2. localStorage is updated with new preference
+3. `dark` class is toggled on `document.documentElement`
+4. CSS variables cascade to all components
+5. UI updates instantly
+
+### No Flashing
+
+To prevent the "flash of unstyled content":
+
+- Theme is applied in a setTimeout(0) on mount
+- This ensures it happens before paint
+- Mounted state prevents hydration mismatches
+
+```typescript
+useEffect(() => {
+  const timer = setTimeout(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    }
+  }, 0);
+  return () => clearTimeout(timer);
+}, []);
+```
+
+<Note>
+  The theme toggle gracefully handles client-side hydration in Next.js.
+</Note>

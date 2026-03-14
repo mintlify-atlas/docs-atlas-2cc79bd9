@@ -1,0 +1,198 @@
+---
+title: 'Rate Limiting'
+description: 'Understand the 60-minute cooldown period and how rate limits protect the system'
+icon: 'clock'
+---
+
+## Overview
+
+The Kids&Us App Versions dashboard implements a rate limiting system to prevent excessive API calls to external app store services. Updates are restricted to once every **60 minutes** unless an admin bypass is used.
+
+## Cooldown Period
+
+The rate limit is defined as a constant in the update API route:
+
+```typescript src/app/api/update/route.ts
+const COOLDOWN_MINUTES = 60;
+```
+
+This means that after a successful update, the system will block any subsequent update requests for 60 minutes.
+
+## Purpose of Rate Limiting
+
+Rate limiting serves several important purposes:
+
+- **Prevent API Spam**: Protects external store APIs (Apple App Store, Microsoft Store, Huawei AppGallery) from excessive requests
+- **Reduce Server Load**: Minimizes unnecessary scraping operations that consume server resources
+- **Avoid IP Bans**: Prevents the application from being blocked by external services due to aggressive scraping
+- **Cost Control**: Reduces bandwidth and computational costs associated with frequent updates
+- **Data Freshness Balance**: App store data doesn't change frequently, so hourly updates provide a good balance
+
+<Note>
+  App version data typically changes infrequently (days or weeks between updates), so a 60-minute cooldown is reasonable for most use cases.
+</Note>
+
+## How Rate Limiting Works
+
+The rate limit is enforced by tracking the timestamp of the last successful update:
+
+```typescript src/app/api/update/route.ts
+if (currentData?.lastUpdate && !isForceUpdate) {
+  const lastUpdate = new Date(currentData.lastUpdate);
+  const diff = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
+
+  if (diff < COOLDOWN_MINUTES) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Rate limit: Please wait ${COOLDOWN_MINUTES} minutes between updates`,
+      },
+      { status: 429 }
+    );
+  }
+}
+```
+
+### How It Works
+
+1. **Check Last Update**: The system reads the `lastUpdate` timestamp from `data.json`
+2. **Calculate Time Difference**: Computes the time elapsed (in minutes) since the last update
+3. **Enforce Cooldown**: If less than 60 minutes have passed, the request is rejected
+4. **Return Error**: A 429 (Too Many Requests) status code is returned with an error message
+
+## Error Messages
+
+When you attempt to update before the cooldown period expires, you'll see:
+
+```json
+{
+  "success": false,
+  "error": "Rate limit: Please wait 60 minutes between updates"
+}
+```
+
+The HTTP status code will be **429 (Too Many Requests)**, which is the standard code for rate limiting.
+
+## Admin Bypass Mechanism
+
+Administrators can bypass the rate limit using the admin key feature. Notice the `!isForceUpdate` condition in the rate limit check:
+
+```typescript src/app/api/update/route.ts
+if (currentData?.lastUpdate && !isForceUpdate) {
+  // Rate limit check is skipped if isForceUpdate is true
+}
+```
+
+When an admin key is provided:
+
+```typescript src/app/api/update/route.ts
+const ADMIN_SECRET = 'force';
+const adminKey = typeof request !== 'undefined' ? request.headers.get('x-admin-key') : null;
+
+if (adminKey !== null && adminKey !== ADMIN_SECRET) {
+  return NextResponse.json({ success: false, error: 'Invalid Admin Key' }, { status: 401 });
+}
+const isForceUpdate = adminKey === ADMIN_SECRET;
+```
+
+The `isForceUpdate` flag is set to `true`, which causes the rate limit check to be completely skipped.
+
+<Info>
+  Learn more about the admin bypass feature in the [Force Update](/admin/force-update) documentation.
+</Info>
+
+## Rate Limit Logic Flow
+
+Here's the complete flow of how rate limiting is enforced:
+
+<Steps>
+  <Step title="Check for admin key">
+    The API first checks if an `x-admin-key` header is present and validates it.
+  </Step>
+  
+  <Step title="Set force update flag">
+    If the admin key is valid, `isForceUpdate` is set to `true`.
+  </Step>
+  
+  <Step title="Evaluate rate limit">
+    If `isForceUpdate` is `false`, the system checks the last update timestamp.
+  </Step>
+  
+  <Step title="Calculate time difference">
+    The difference between now and the last update is calculated in minutes.
+  </Step>
+  
+  <Step title="Enforce or allow">
+    If less than 60 minutes have passed, return a 429 error. Otherwise, allow the update to proceed.
+  </Step>
+</Steps>
+
+## Implementation Details
+
+The rate limiting system relies on:
+
+- **Data Persistence**: The `lastUpdate` timestamp is stored in `data.json` after each successful update
+- **Timestamp Comparison**: Simple time arithmetic using JavaScript `Date` objects
+- **Conditional Logic**: The `!isForceUpdate` check allows admin bypass
+
+### Complete Rate Limit Code
+
+From `src/app/api/update/route.ts:8-34`:
+
+```typescript
+const COOLDOWN_MINUTES = 60;
+
+export async function POST(request: Request) {
+  try {
+    const currentData = await readData<{ lastUpdate?: string }>();
+
+    const ADMIN_SECRET = 'force';
+    const adminKey = typeof request !== 'undefined' ? request.headers.get('x-admin-key') : null;
+
+    // Strict check: If header exists (even empty) but is wrong, deny immediately
+    if (adminKey !== null && adminKey !== ADMIN_SECRET) {
+      return NextResponse.json({ success: false, error: 'Invalid Admin Key' }, { status: 401 });
+    }
+    const isForceUpdate = adminKey === ADMIN_SECRET;
+
+    if (currentData?.lastUpdate && !isForceUpdate) {
+      const lastUpdate = new Date(currentData.lastUpdate);
+      const diff = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
+
+      if (diff < COOLDOWN_MINUTES) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Rate limit: Please wait ${COOLDOWN_MINUTES} minutes between updates`,
+          },
+          { status: 429 }
+        );
+      }
+    }
+
+    // ... update logic continues
+  }
+}
+```
+
+## Customizing the Cooldown Period
+
+If you need to adjust the rate limit for your deployment:
+
+1. Modify the `COOLDOWN_MINUTES` constant in `src/app/api/update/route.ts:6`
+2. Consider your use case:
+   - **Shorter cooldown** (e.g., 30 minutes): More frequent updates, higher API load
+   - **Longer cooldown** (e.g., 120 minutes): Reduced API load, less current data
+3. Rebuild and redeploy your application
+
+<Warning>
+  Setting the cooldown too low may result in your IP being rate-limited or banned by external app store APIs. Always respect the terms of service for third-party APIs you're scraping.
+</Warning>
+
+## Best Practices
+
+- **Monitor Update Frequency**: Track how often users attempt to update and adjust the cooldown if needed
+- **Communicate Limits**: Make the 60-minute limit clear in the UI to set user expectations
+- **Use Admin Bypass Sparingly**: Reserve force updates for genuine emergencies and testing
+- **Consider Caching**: Implement client-side caching to avoid unnecessary API calls
+- **Log Rate Limit Hits**: Monitor how often users hit the rate limit to understand usage patterns

@@ -1,0 +1,147 @@
+---
+title: 'Dashboard Interface'
+description: 'Overview of the main dashboard and how to navigate the app version tracker'
+icon: 'table-layout'
+---
+
+## Overview
+
+The Kids&Us App Versions dashboard provides a centralized view of all your applications and their current versions across multiple app stores. The interface is designed for quick scanning and easy access to store listings.
+
+## Dashboard Layout
+
+The dashboard features a clean, responsive layout that adapts to your screen size:
+
+### Header
+
+The top header contains:
+- **Kids&Us App Versions** title (clickable to scroll to top)
+- **Theme toggle** button in the top-right corner
+
+### Main Content Area
+
+The main area displays:
+- **Update Control** section with refresh button and last update timestamp
+- **Application Table** showing all apps and their store versions
+
+## Table View
+
+The dashboard table organizes information into four columns:
+
+<CardGroup cols={2}>
+  <Card title="Application" icon="mobile">
+    Shows the app icon and name. Each app is grouped with its store listings.
+  </Card>
+  <Card title="Store" icon="store">
+    The platform where the app is published (Google Play, App Store iOS, etc.). Store names are clickable links.
+  </Card>
+  <Card title="Version" icon="tag">
+    The current version number displayed as an interactive badge. Click to copy.
+  </Card>
+  <Card title="Last Update" icon="calendar">
+    The date when the app was last updated on that store.
+  </Card>
+</CardGroup>
+
+## Responsive Design
+
+### Desktop View
+
+On larger screens, the dashboard displays a traditional table with all columns visible:
+- App icons appear on the left
+- Multiple store entries per app are grouped under a single app row
+- Clean, scannable layout with hover effects
+
+### Mobile View
+
+On mobile devices, the layout adapts to card-based views:
+- Each app is displayed as a card with its icon and name in the header
+- Store information is shown as individual sections within each card
+- Stacked layout for easy scrolling
+
+## Interpreting the Display
+
+### Application Groups
+
+Apps are organized by their internal order ID. Each application can have multiple store entries:
+
+<CodeGroup>
+```json Example: MyKids App
+{
+  "name": "MyKids",
+  "icon": "[app icon URL]",
+  "stores": [
+    {
+      "name": "Google Play",
+      "version": "1.3.9",
+      "lastUpdateDate": "10/02/2026"
+    },
+    {
+      "name": "App Store iOS",
+      "version": "1.3.9",
+      "lastUpdateDate": "12/02/2026"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Version Badges
+
+Version numbers are displayed as interactive badges:
+- **Default state**: Gray background with monospace font
+- **Hover state**: Slightly darker background
+- **Clicked state**: Briefly shows "Copied!" in green
+- Click any version badge to copy the version number to your clipboard
+
+### Store Links
+
+Store names are clickable links that open the app's store page in a new tab:
+- Google Play → Google Play Store listing
+- App Store iOS → Apple App Store listing
+- Microsoft Store → Microsoft Store listing
+- Huawei AppGallery → AppGallery listing
+
+<Note>
+  Store links open in a new tab with `noopener noreferrer` for security.
+</Note>
+
+## Navigation Features
+
+### Scroll to Top
+
+Click the "Kids&Us App Versions" title in the header to smoothly scroll back to the top of the page.
+
+### Loading States
+
+The dashboard shows appropriate loading states:
+- **Initial Load**: Skeleton placeholders appear while data is being fetched
+- **Updating**: Progress bar appears below the update button
+- **No Data**: Helpful message prompts you to generate initial data
+
+<Tip>
+  The skeleton loading state preserves the layout structure, preventing content shifts when data loads.
+</Tip>
+
+## Visual Indicators
+
+### App Icons
+
+Each app displays its official icon:
+- Icons are loaded from the app store CDN
+- If an icon fails to load, a fallback shows the first letter of the app name
+- Icons are 24x24 pixels on desktop, 32x32 pixels on mobile
+
+### Table Styling
+
+- **Row hover**: Rows highlight on hover for easier scanning
+- **Borders**: Subtle borders separate each row
+- **Spacing**: Generous padding for comfortable reading
+- **Typography**: Carefully sized text for optimal readability
+
+## Accessibility
+
+- **ARIA labels**: All interactive elements have descriptive labels
+- **Semantic HTML**: Proper table structure for screen readers
+- **Keyboard navigation**: Full keyboard support for all interactions
+- **Focus indicators**: Clear focus states for keyboard users

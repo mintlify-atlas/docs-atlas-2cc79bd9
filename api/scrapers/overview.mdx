@@ -1,0 +1,299 @@
+---
+title: 'Scraper Architecture'
+description: 'Overview of the app version scraper system used to fetch data from multiple app stores'
+---
+
+## Purpose
+
+The scraper system is responsible for fetching version information from multiple app stores (Apple App Store, Google Play, Microsoft Store, and Huawei AppGallery). It provides a unified interface for extracting app metadata including:
+
+- Current version number
+- Last update date
+- App icon URLs
+
+## Architecture Components
+
+The scraper system uses a Factory pattern combined with a service orchestrator to manage multiple store implementations.
+
+<CardGroup cols={2}>
+  <Card title="ScraperFactory" icon="industry" href="#scraperfactory">
+    Creates the appropriate scraper instance based on store type
+  </Card>
+  <Card title="ScraperService" icon="gears" href="#scraperservice">
+    Orchestrates scraping across multiple apps and stores
+  </Card>
+  <Card title="IScraper Interface" icon="plug" href="#iscraper-interface">
+    Defines the contract all scrapers must implement
+  </Card>
+  <Card title="Store Implementations" icon="store" href="#store-scrapers">
+    Individual scrapers for each app store platform
+  </Card>
+</CardGroup>
+
+## IScraper Interface
+
+All scrapers implement the `IScraper` interface, ensuring consistent behavior across different store types.
+
+```typescript src/lib/scrapers/types.ts
+export interface IScraper {
+  scrape(config: StoreConfig): Promise<ScrapeResult>;
+}
+
+export interface StoreConfig {
+  id: string;
+  type: 'google-play' | 'itunes' | 'microsoft' | 'huawei';
+  packageId?: string;    // For Google Play
+  appId?: string;        // For iTunes and Huawei
+  productId?: string;    // For Microsoft Store
+}
+
+export interface ScrapeResult {
+  version: string;
+  lastUpdateDate: string;
+  icon?: string;
+  error?: string;
+}
+```
+
+### Key Design Principles
+
+1. **Single Responsibility**: Each scraper handles one store type
+2. **Unified Interface**: All scrapers return the same data structure
+3. **Error Isolation**: Failures in one scraper don't affect others
+4. **Type Safety**: TypeScript ensures correct configuration per store
+
+## ScraperFactory
+
+The `ScraperFactory` class uses the factory pattern to instantiate the correct scraper based on store type.
+
+```typescript src/lib/scrapers/factory.ts
+export class ScraperFactory {
+  static getScraper(type: StoreConfig['type']): IScraper {
+    switch (type) {
+      case 'itunes':
+        return new AppStoreScraper();
+      case 'google-play':
+        return new GooglePlayScraper();
+      case 'microsoft':
+        return new MicrosoftStoreScraper();
+      case 'huawei':
+        return new HuaweiScraper();
+      default:
+        throw new Error(`Unsupported store type: ${type}`);
+    }
+  }
+}
+```
+
+### Usage Example
+
+```typescript
+const scraper = ScraperFactory.getScraper('itunes');
+const result = await scraper.scrape({
+  id: 'ios-app',
+  type: 'itunes',
+  appId: '1234567890'
+});
+```
+
+## ScraperService
+
+The `ScraperService` orchestrates the entire scraping process, handling:
+
+- Parallel scraping of multiple stores per app
+- Retry logic with configurable attempts
+- Icon fallback from any successful store
+- Graceful error handling (returns 'N/A' instead of failing)
+- Store URL generation
+
+```typescript src/lib/scrapers/service.ts
+export class ScraperService {
+  async scrapeAll(apps: AppConfig[]): Promise<{ lastUpdate: string; apps: App[] }> {
+    const results: App[] = [];
+
+    for (const app of apps) {
+      const appData: App = {
+        id: app.id,
+        name: app.name,
+        orderId: app.orderId,
+        icon: '',
+        stores: [],
+      };
+
+      // Scrape all stores in parallel for this app
+      const scrapePromises = app.stores.map(async (store) => {
+        try {
+          const scraper = ScraperFactory.getScraper(store.type);
+          const result = await this.scrapeWithRetry(scraper, store);
+
+          // Use icon from first successful scrape
+          if (!appData.icon && result.icon) {
+            appData.icon = result.icon;
+          }
+
+          return {
+            id: store.id,
+            name: store.name,
+            version: result.version,
+            lastUpdateDate: result.lastUpdateDate,
+            url: this.getStoreUrl(store),
+          };
+        } catch {
+          // Return N/A on failure instead of throwing
+          return {
+            id: store.id,
+            name: store.name,
+            version: 'N/A',
+            lastUpdateDate: 'N/A',
+            url: this.getStoreUrl(store),
+          };
+        }
+      });
+
+      appData.stores = await Promise.all(scrapePromises);
+      results.push(appData);
+    }
+
+    return {
+      lastUpdate: new Date().toISOString(),
+      apps: results,
+    };
+  }
+}
+```
+
+### Retry Mechanism
+
+The service includes automatic retry logic (default 3 attempts) to handle transient network failures:
+
+```typescript src/lib/scrapers/service.ts
+private async scrapeWithRetry(
+  scraper: IScraper,
+  config: StoreConfig,
+  retries = 3
+): Promise<ScrapeResult> {
+  let lastError;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await scraper.scrape(config);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+```
+
+## Error Handling & Validation
+
+The system uses [Zod](https://zod.dev/) for runtime schema validation of API responses, ensuring data integrity.
+
+<CodeGroup>
+
+```typescript iTunes Schema
+export const ItunesResponseSchema = z.object({
+  results: z.array(
+    z.object({
+      version: z.string().optional(),
+      currentVersionReleaseDate: z.string().optional(),
+      artworkUrl512: z.string().optional(),
+      artworkUrl100: z.string().optional(),
+    })
+  ),
+});
+```
+
+```typescript Microsoft Schema
+export const MicrosoftStoreResponseSchema = z.object({
+  installer: z
+    .object({
+      architectures: z.record(
+        z.string(),
+        z.object({
+          version: z.string().optional(),
+        })
+      ),
+    })
+    .optional(),
+  packageLastUpdateDateUtc: z.string().optional(),
+  iconUrl: z.string().optional(),
+});
+```
+
+```typescript Huawei Schema
+export const HuaweiResponseSchema = z.object({
+  layoutData: z
+    .array(
+      z.object({
+        dataList: z
+          .array(
+            z.object({
+              versionName: z.string().optional(),
+              version: z.string().optional(),
+              releaseDate: z.string().optional(),
+              updateTime: z.string().optional(),
+              icon: z.string().optional(),
+            })
+          )
+          .optional(),
+      })
+    )
+    .optional(),
+});
+```
+
+</CodeGroup>
+
+### Validation Example
+
+```typescript src/lib/scrapers/app-store.ts
+const json = await response.json();
+const parsed = ItunesResponseSchema.safeParse(json);
+
+if (!parsed.success) {
+  console.error('iTunes API schema validation failed:', parsed.error);
+  throw new Error('Invalid iTunes API response structure');
+}
+
+const data = parsed.data; // Type-safe data
+```
+
+## Store Scrapers
+
+Each store has its own implementation with store-specific logic:
+
+<CardGroup cols={2}>
+  <Card title="App Store Scraper" icon="apple" href="/api/scrapers/app-store">
+    iTunes API integration for iOS and macOS apps
+  </Card>
+  <Card title="Google Play Scraper" icon="google" href="/api/scrapers/google-play">
+    HTML scraping for Android apps on Google Play
+  </Card>
+  <Card title="Microsoft Store Scraper" icon="microsoft" href="/api/scrapers/microsoft-store">
+    Microsoft Store API for Windows apps
+  </Card>
+  <Card title="Huawei Scraper" icon="mobile" href="/api/scrapers/huawei">
+    AppGallery API integration with authentication
+  </Card>
+</CardGroup>
+
+## Execution Flow
+
+1. **Configuration**: Apps are configured with store IDs (appId, packageId, productId)
+2. **Factory Selection**: `ScraperFactory.getScraper()` creates the appropriate scraper
+3. **Parallel Execution**: All stores for an app are scraped simultaneously
+4. **Retry Logic**: Failed requests are retried up to 3 times
+5. **Validation**: Response data is validated against Zod schemas
+6. **Aggregation**: Results are combined into the final App structure
+7. **Error Handling**: Failed scrapers return 'N/A' instead of breaking the entire process
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="App Store Implementation" icon="code" href="/api/scrapers/app-store">
+    Learn about the iTunes API scraper
+  </Card>
+  <Card title="Google Play Implementation" icon="code" href="/api/scrapers/google-play">
+    Understand HTML scraping for Google Play
+  </Card>
+</CardGroup>

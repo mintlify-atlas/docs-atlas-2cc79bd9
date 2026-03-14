@@ -1,0 +1,350 @@
+---
+title: Testing
+description: Testing strategy, frameworks, and best practices using Vitest
+---
+
+## Overview
+
+The Kids&Us App Versions project uses **Vitest** as its testing framework, providing fast unit tests with excellent TypeScript and React support. Tests focus on critical business logic, particularly scrapers and utility functions.
+
+<Info>
+Vitest is a modern, Vite-powered testing framework that's compatible with Jest's API while offering superior performance and developer experience.
+</Info>
+
+## Test Framework
+
+### Vitest Configuration
+
+The project is configured via `vitest.config.mts`:
+
+```typescript vitest.config.mts
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/tests/setup.ts'],
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+});
+```
+
+**Key Configuration:**
+- **Environment**: `jsdom` for simulating browser APIs
+- **Globals**: Enables `describe`, `it`, `expect` without imports
+- **Setup Files**: Runs `setup.ts` before each test file
+- **Path Aliases**: Supports `@/` imports in tests
+
+### Test Setup
+
+The `src/tests/setup.ts` file configures the test environment:
+
+```typescript src/tests/setup.ts
+import { vi } from 'vitest';
+
+vi.mock('server-only', () => {
+  return {};
+});
+```
+
+This mocks Next.js server-only modules to prevent errors in the test environment.
+
+## Running Tests
+
+<CodeGroup>
+```bash Run All Tests
+npm test
+```
+
+```bash Watch Mode
+npm test -- --watch
+```
+
+```bash Run Specific File
+npm test -- src/tests/unit/scrapers/app-store.test.ts
+```
+
+```bash Coverage Report
+npm test -- --coverage
+```
+</CodeGroup>
+
+<Tip>
+Tests automatically run on every commit via Husky pre-commit hooks, ensuring code quality.
+</Tip>
+
+## Test Structure
+
+### Directory Organization
+
+```text
+src/tests/
+├── setup.ts                        # Global test configuration
+└── unit/                           # Unit tests
+    ├── scrapers/                   # Scraper tests
+    │   ├── app-store.test.ts      # iTunes App Store
+    │   ├── google-play.test.ts    # Google Play Store
+    │   ├── huawei.test.ts         # Huawei AppGallery
+    │   └── microsoft-store.test.ts # Microsoft Store
+    └── utils/                      # Utility tests
+        ├── date.test.ts           # Date utilities
+        └── github-storage.test.ts # GitHub storage
+```
+
+Tests mirror the source code structure for easy navigation.
+
+## Testing Strategies
+
+### Scraper Testing
+
+Scrapers are the core business logic, extracting version data from external APIs. Each scraper test covers:
+
+1. **Success Path**: Valid API responses
+2. **Error Handling**: HTTP errors (404, 500)
+3. **Validation Failures**: Invalid response structures
+4. **Edge Cases**: Empty results, missing fields
+
+#### Example: App Store Scraper Test
+
+```typescript src/tests/unit/scrapers/app-store.test.ts
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
+import { AppStoreScraper } from '@/lib/scrapers/app-store';
+import { StoreConfig } from '@/lib/scrapers/types';
+
+describe('AppStoreScraper', () => {
+  let scraper: AppStoreScraper;
+
+  beforeEach(() => {
+    scraper = new AppStoreScraper();
+    global.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('extracts version correctly from valid JSON response', async () => {
+    const mockData = {
+      results: [
+        {
+          version: '2.5.1',
+          currentVersionReleaseDate: '2023-10-27T10:00:00Z',
+          artworkUrl512: 'https://example.com/icon.png',
+        },
+      ],
+    };
+
+    (global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      json: async () => mockData,
+    });
+
+    const config: StoreConfig = { 
+      id: 'test', 
+      type: 'itunes', 
+      appId: '123456' 
+    };
+    
+    const result = await scraper.scrape(config);
+    expect(result.version).toBe('2.5.1');
+    expect(result.icon).toBe('https://example.com/icon.png');
+  });
+
+  it('throws error if app is not found (empty results)', async () => {
+    const mockData = { results: [] };
+
+    (global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      json: async () => mockData,
+    });
+
+    const config: StoreConfig = { 
+      id: 'test', 
+      type: 'itunes', 
+      appId: '123456' 
+    };
+    
+    await expect(scraper.scrape(config)).rejects.toThrow('App not found');
+  });
+
+  it('throws Zod error if response structure is invalid', async () => {
+    const invalidData = {
+      results: 'not-an-array', // Invalid type
+    };
+
+    (global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      json: async () => invalidData,
+    });
+
+    const config: StoreConfig = { 
+      id: 'test', 
+      type: 'itunes', 
+      appId: '123456' 
+    };
+    
+    await expect(scraper.scrape(config))
+      .rejects.toThrow('Invalid iTunes API response structure');
+  });
+
+  it('throws HTTP error on 404', async () => {
+    (global.fetch as Mock).mockResolvedValue({
+      ok: false,
+      status: 404,
+    });
+
+    const config: StoreConfig = { 
+      id: 'test', 
+      type: 'itunes', 
+      appId: '123456' 
+    };
+    
+    await expect(scraper.scrape(config)).rejects.toThrow('HTTP 404');
+  });
+});
+```
+
+### Mocking Strategy
+
+To ensure tests are fast and deterministic, external dependencies are mocked:
+
+<AccordionGroup>
+  <Accordion title="Mocking Fetch Requests">
+    Network requests are mocked using Vitest's `vi.fn()`:
+
+    ```typescript
+    global.fetch = vi.fn();
+
+    (global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: 'mock data' }),
+    });
+    ```
+
+    This prevents actual HTTP calls during tests.
+  </Accordion>
+
+  <Accordion title="Mocking Octokit (GitHub API)">
+    GitHub API clients are mocked to avoid rate limits:
+
+    ```typescript
+    vi.mock('octokit', () => ({
+      Octokit: vi.fn(() => ({
+        rest: {
+          repos: {
+            getContent: vi.fn().mockResolvedValue(mockData),
+          },
+        },
+      })),
+    }));
+    ```
+  </Accordion>
+
+  <Accordion title="Mocking Server-Only Modules">
+    Next.js server-only imports are mocked in `setup.ts`:
+
+    ```typescript
+    vi.mock('server-only', () => ({}));
+    ```
+
+    This allows testing of server components in the jsdom environment.
+  </Accordion>
+</AccordionGroup>
+
+## Test Coverage
+
+The test suite focuses on:
+
+✅ **Scrapers**: All store-specific scrapers (App Store, Google Play, Huawei, Microsoft Store)  
+✅ **Utilities**: Date formatting, data transformation, storage helpers  
+✅ **Schema Validation**: Zod schema parsing and error handling  
+✅ **Error Paths**: HTTP errors, validation failures, edge cases
+
+<Warning>
+UI components and integration tests are not currently covered. Focus is on business logic that's critical to data accuracy.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Write tests before fixing bugs">
+    When you find a bug, write a failing test that reproduces it, then fix the code.
+  </Step>
+
+  <Step title="Mock external dependencies">
+    Never make real HTTP requests or database calls in unit tests. Use mocks for predictable, fast tests.
+  </Step>
+
+  <Step title="Test error paths">
+    Don't just test the happy path. Ensure your code handles errors gracefully.
+  </Step>
+
+  <Step title="Keep tests isolated">
+    Each test should be independent. Use `beforeEach` and `afterEach` to reset state.
+  </Step>
+
+  <Step title="Use descriptive test names">
+    Test names should clearly describe what's being tested and the expected outcome.
+  </Step>
+</Steps>
+
+## Continuous Integration
+
+Tests run automatically in multiple scenarios:
+
+1. **Pre-commit Hook**: Via Husky, runs `npx vitest run` before each commit
+2. **Manual Execution**: Developers run `npm test` during development
+3. **CI/CD Pipeline**: Automated testing on pull requests (if configured)
+
+<Info>
+The pre-commit hook ensures broken code never reaches the repository.
+</Info>
+
+## Writing New Tests
+
+When adding new features, follow these patterns:
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+describe('FeatureName', () => {
+  beforeEach(() => {
+    // Setup code here
+  });
+
+  it('should do something specific', () => {
+    // Arrange: Set up test data
+    const input = 'test';
+
+    // Act: Execute the code
+    const result = myFunction(input);
+
+    // Assert: Verify the result
+    expect(result).toBe('expected');
+  });
+
+  it('should handle errors gracefully', async () => {
+    // Test error scenarios
+    await expect(asyncFunction()).rejects.toThrow('Expected error');
+  });
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Contributing Guide" icon="code-branch" href="/development/contributing">
+    Learn about the contribution workflow
+  </Card>
+  <Card title="Project Structure" icon="folder-tree" href="/development/project-structure">
+    Understand the codebase organization
+  </Card>
+</CardGroup>

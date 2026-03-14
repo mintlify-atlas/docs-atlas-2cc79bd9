@@ -1,0 +1,356 @@
+---
+title: 'UI Components'
+description: 'Shadcn/ui component library used in the Kids&Us App Versions project'
+icon: 'palette'
+---
+
+## Overview
+
+The Kids&Us App Versions project uses [Shadcn/ui](https://ui.shadcn.com/) as its UI component library. Shadcn/ui is a collection of reusable components built with Radix UI and styled with Tailwind CSS. Unlike traditional component libraries, Shadcn/ui components are copied directly into your project, giving you full control over the code.
+
+## Configuration
+
+The project uses the following Shadcn/ui configuration (`components.json`):
+
+```json
+{
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui"
+  }
+}
+```
+
+### Key Configuration Details
+
+- **Style**: Uses the "new-york" style variant
+- **RSC**: Enabled for React Server Components
+- **Base Color**: Neutral color scheme
+- **CSS Variables**: Enabled for theme customization
+- **Icon Library**: Lucide React icons
+
+## Available Components
+
+All UI components are located in `src/components/ui/`. The project currently includes:
+
+<CardGroup cols={2}>
+  <Card title="Button" icon="hand-pointer" href="#button">
+    Interactive buttons with multiple variants and sizes
+  </Card>
+  <Card title="Card" icon="square" href="#card">
+    Container component for grouping related content
+  </Card>
+  <Card title="Table" icon="table" href="#table">
+    Structured data display with headers and cells
+  </Card>
+  <Card title="Badge" icon="tag" href="#badge">
+    Small status indicators and labels
+  </Card>
+  <Card title="Skeleton" icon="spinner" href="#skeleton">
+    Loading placeholders for content
+  </Card>
+  <Card title="Dialog" icon="window" href="#dialog">
+    Modal dialogs for user interactions
+  </Card>
+  <Card title="Input" icon="keyboard" href="#input">
+    Text input fields
+  </Card>
+  <Card title="Label" icon="text" href="#label">
+    Form field labels
+  </Card>
+  <Card title="Progress" icon="chart-line" href="#progress">
+    Progress indicators
+  </Card>
+  <Card title="Sonner" icon="bell" href="#sonner">
+    Toast notifications
+  </Card>
+</CardGroup>
+
+## Styling Approach
+
+### Tailwind CSS
+
+All components are styled using Tailwind CSS utility classes. The project uses a custom Tailwind configuration with CSS variables for theming:
+
+```css
+/* Example CSS variables for theming */
+--background: 0 0% 100%;
+--foreground: 0 0% 3.9%;
+--primary: 0 0% 9%;
+--primary-foreground: 0 0% 98%;
+```
+
+### Class Variance Authority (CVA)
+
+Components use [CVA](https://cva.style/) for managing variants. Example from the Button component:
+
+```tsx
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all...",
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        destructive: 'bg-destructive text-white hover:bg-destructive/90',
+        outline: 'border bg-background shadow-xs hover:bg-accent',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        link: 'text-primary underline-offset-4 hover:underline',
+      },
+      size: {
+        default: 'h-9 px-4 py-2',
+        sm: 'h-8 rounded-md gap-1.5 px-3',
+        lg: 'h-10 rounded-md px-6',
+        icon: 'size-9',
+      },
+    },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
+  }
+);
+```
+
+## Component Examples
+
+### Button
+
+The Button component supports multiple variants and sizes:
+
+```tsx src/components/ui/button.tsx
+import { Button } from '@/components/ui/button';
+
+// Primary button
+<Button>Click me</Button>
+
+// Outline variant
+<Button variant="outline">Outline</Button>
+
+// Small size
+<Button size="sm">Small</Button>
+
+// Icon button
+<Button size="icon">
+  <Icon className="h-4 w-4" />
+</Button>
+```
+
+### Card
+
+The Card component provides a flexible container with subcomponents:
+
+```tsx src/components/ui/card.tsx
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+
+<Card>
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <p>Card content goes here</p>
+  </CardContent>
+</Card>
+```
+
+### Table
+
+The Table component provides structured data display:
+
+```tsx src/components/ui/table.tsx
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+
+<Table>
+  <TableHeader>
+    <TableRow>
+      <TableHead>Name</TableHead>
+      <TableHead>Version</TableHead>
+    </TableRow>
+  </TableHeader>
+  <TableBody>
+    <TableRow>
+      <TableCell>App Name</TableCell>
+      <TableCell>1.0.0</TableCell>
+    </TableRow>
+  </TableBody>
+</Table>
+```
+
+### Badge
+
+The Badge component displays small status indicators:
+
+```tsx src/components/ui/badge.tsx
+import { Badge } from '@/components/ui/badge';
+
+<Badge>Default</Badge>
+<Badge variant="secondary">Secondary</Badge>
+<Badge variant="outline">Outline</Badge>
+<Badge variant="destructive">Destructive</Badge>
+```
+
+### Skeleton
+
+The Skeleton component provides loading placeholders:
+
+```tsx src/components/ui/skeleton.tsx
+import { Skeleton } from '@/components/ui/skeleton';
+
+<Skeleton className="h-4 w-32" />
+<Skeleton className="h-8 w-8 rounded-md" />
+```
+
+## Adding New Components
+
+To add a new Shadcn/ui component to the project:
+
+1. **Install using the CLI** (recommended):
+   ```bash
+   npx shadcn@latest add [component-name]
+   ```
+
+2. **Or copy manually**:
+   - Visit [ui.shadcn.com](https://ui.shadcn.com/)
+   - Find the component you need
+   - Copy the code into `src/components/ui/[component-name].tsx`
+   - Install any required dependencies
+
+## Customization
+
+### Modifying Existing Components
+
+Since components are copied into your project, you have full control to customize them:
+
+1. **Direct modification**: Edit the component file in `src/components/ui/`
+2. **Add variants**: Extend the CVA variants object
+3. **Adjust styling**: Modify Tailwind classes
+4. **Change behavior**: Update component logic
+
+### Theming
+
+The project uses CSS variables for theming. To customize the theme:
+
+1. Edit `src/app/globals.css`
+2. Modify CSS variables for colors, spacing, etc.
+3. Both light and dark modes are supported
+
+```css src/app/globals.css
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    /* ... more variables */
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    /* ... more variables */
+  }
+}
+```
+
+## Utility Functions
+
+The `cn` utility function is used throughout the components for merging Tailwind classes:
+
+```tsx src/lib/utils.ts
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+```
+
+This function combines:
+- **clsx**: Conditionally construct className strings
+- **tailwind-merge**: Merge Tailwind classes and resolve conflicts
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use the cn utility for custom classes">
+    Always use the `cn()` utility when adding custom classes to components. This ensures proper class merging and prevents conflicts.
+
+    ```tsx
+    <Button className={cn("custom-class", someCondition && "conditional-class")}>
+      Click me
+    </Button>
+    ```
+  </Accordion>
+
+  <Accordion title="Maintain component composition">
+    Keep components composable by using subcomponents. For example, Card has CardHeader, CardTitle, CardContent, etc.
+
+    ```tsx
+    <Card>
+      <CardHeader>
+        <CardTitle>Title</CardTitle>
+      </CardHeader>
+      <CardContent>Content</CardContent>
+    </Card>
+    ```
+  </Accordion>
+
+  <Accordion title="Use data attributes for styling hooks">
+    Components use `data-slot` attributes for styling hooks. Don't remove these as they may be used for styling.
+
+    ```tsx
+    <div data-slot="card" className="...">
+      {/* Component content */}
+    </div>
+    ```
+  </Accordion>
+
+  <Accordion title="Leverage CVA for variants">
+    Use Class Variance Authority (CVA) for managing component variants instead of conditional classes.
+
+    ```tsx
+    const variants = cva("base-classes", {
+      variants: {
+        size: {
+          sm: "small-classes",
+          lg: "large-classes",
+        },
+      },
+    });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="DashboardTable" icon="table" href="./dashboard-table">
+    Learn about the main table component that displays app version data
+  </Card>
+  <Card title="VersionBadge" icon="tag" href="./version-badge">
+    Understand the badge component used for displaying version numbers
+  </Card>
+  <Card title="Project Structure" icon="sitemap" href="../project-structure">
+    Explore the overall project architecture
+  </Card>
+  <Card title="Development Setup" icon="paintbrush" href="../setup">
+    Learn about setting up your development environment
+  </Card>
+</CardGroup>

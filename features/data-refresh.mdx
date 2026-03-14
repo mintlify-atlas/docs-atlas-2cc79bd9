@@ -1,0 +1,268 @@
+---
+title: 'Data Refresh'
+description: 'Learn how to update app version data with rate limiting and progress tracking'
+icon: 'arrows-rotate'
+---
+
+## Overview
+
+The Kids&Us App Versions dashboard fetches live data from app stores to ensure version information is always up-to-date. The refresh system includes rate limiting, progress indicators, and error handling.
+
+## Manual Refresh
+
+### Update Button
+
+The primary way to refresh data is using the **Update Data** button:
+
+1. Located at the top of the dashboard, below the header
+2. Click to trigger a manual data refresh
+3. The button shows "Updating..." while fetching new data
+4. Disabled during updates and cooldown periods
+
+<Note>
+  The first time you visit the dashboard, you'll need to click the update button to generate initial data.
+</Note>
+
+### Update Process
+
+When you click "Update Data":
+
+1. **Initiation**: Button text changes to "Updating..."
+2. **Progress**: A progress bar appears showing update status
+3. **Scraping**: The system fetches version data from all configured stores
+4. **Completion**: Data is saved and the table updates automatically
+5. **Notification**: Success toast appears confirming the update
+
+## Rate Limiting
+
+### 60-Minute Cooldown
+
+To prevent excessive requests to app stores, updates are limited:
+
+- **Cooldown Period**: 60 minutes between updates
+- **Enforcement**: Button is disabled during cooldown
+- **Countdown**: Remaining time displayed next to "Last update" text
+
+<CodeGroup>
+```typescript Rate Limit Configuration
+const COOLDOWN_MINUTES = 60;
+```
+</CodeGroup>
+
+### Cooldown Display
+
+The UI shows cooldown information clearly:
+
+```
+Last update: 2026-03-13 15:57 (45m remaining)
+```
+
+- Countdown updates every minute
+- Shows minutes remaining in parentheses
+- When cooldown expires, the button becomes enabled again
+
+<Warning>
+  The cooldown is calculated from the last successful update timestamp, not from when you clicked the button.
+</Warning>
+
+## Admin Override
+
+### Force Update (Admin Only)
+
+Administrators can bypass the cooldown period:
+
+1. Press the `.` (period) key anywhere on the dashboard
+2. An "Admin Force Update" dialog appears
+3. Enter the admin secret key
+4. Click "Update Now" to force an immediate refresh
+
+<CodeGroup>
+```typescript Admin Secret
+const ADMIN_SECRET = 'force';
+```
+</CodeGroup>
+
+### Admin Dialog
+
+The admin dialog includes:
+- **Title**: "Admin Force Update"
+- **Description**: Instructions to enter the secret key
+- **Password field**: Masked input for the secret key
+- **Update Now button**: Submits the force update request
+
+<Note>
+  The admin dialog can be opened with the `.` key but only when not typing in an input field.
+</Note>
+
+### Security
+
+Admin override requests are validated server-side:
+- Invalid keys return a `401 Unauthorized` error
+- The secret key is sent via the `x-admin-key` header
+- Empty or missing keys trigger normal rate limit checks
+
+## Progress Indicators
+
+### Progress Bar
+
+A visual progress bar appears during updates:
+
+- **Initial**: Starts at 10% immediately
+- **Progress**: Gradually increases to 90% during scraping
+- **Random increments**: Increases by random amounts (0-10%) every 500ms
+- **Completion**: Jumps to 100% when update finishes
+- **Fade out**: Disappears after 1 second
+
+### Progress Text
+
+Below the progress bar, status text indicates:
+- **Updating...**: While the update is in progress
+- **Complete**: When the update finishes successfully
+
+<Tip>
+  The progress bar uses realistic increments to provide feedback without making false guarantees about completion time.
+</Tip>
+
+## Update States
+
+### Button States
+
+The Update Data button has multiple states:
+
+1. **Ready**: Default state, blue button saying "Update Data"
+2. **Updating**: Gray button saying "Updating..." (disabled)
+3. **Cooldown**: Gray button saying "Update Data" with time remaining (disabled)
+4. **Loading**: Gray button (disabled) when initial data is loading
+
+### Last Update Display
+
+The timestamp area shows different messages:
+
+| State | Display |
+|-------|--------|
+| Initial load | "Loading..." |
+| Loading data | "Retrieving data..." |
+| No previous update | "Last update: Never" |
+| With timestamp | "Last update: 2026-03-13 15:57" |
+| With cooldown | "Last update: 2026-03-13 15:57 (45m remaining)" |
+
+## Success Notifications
+
+### Toast Messages
+
+The dashboard uses toast notifications for feedback:
+
+<CardGroup cols={2}>
+  <Card title="Loading" icon="spinner">
+    "Updating data..." - Shown while fetching
+  </Card>
+  <Card title="Success" icon="check">
+    "Data updated successfully" - Shown on completion
+  </Card>
+  <Card title="Error" icon="xmark">
+    Error message - Shown if update fails
+  </Card>
+  <Card title="Admin" icon="key">
+    "Verifying admin access..." - Shown for admin updates
+  </Card>
+</CardGroup>
+
+### Success Flow
+
+1. Click "Update Data"
+2. Toast appears: "Updating data..."
+3. Progress bar animates from 10% to 90%
+4. Update completes
+5. Progress bar jumps to 100%
+6. Toast updates: "Data updated successfully" with green checkmark
+7. Table refreshes with new data
+8. Progress bar fades out
+
+## Error Handling
+
+### Rate Limit Error
+
+If you try to update during cooldown:
+
+```json
+{
+  "success": false,
+  "error": "Rate limit: Please wait 60 minutes between updates",
+  "status": 429
+}
+```
+
+- Error toast displays the message
+- Button remains disabled
+- No data changes occur
+
+### Scraping Errors
+
+If store scraping fails:
+
+```json
+{
+  "success": false,
+  "error": "Failed to fetch store data",
+  "status": 500
+}
+```
+
+- Error toast shows the failure message
+- Previous data remains displayed
+- You can retry after the error is resolved
+
+### Invalid Admin Key
+
+If the admin key is incorrect:
+
+```json
+{
+  "success": false,
+  "error": "Invalid Admin Key",
+  "status": 401
+}
+```
+
+- Error toast displays "Invalid Admin Key"
+- Dialog closes automatically
+- No update is performed
+
+<Warning>
+  Store scraping can fail if store websites change their HTML structure or if network issues occur.
+</Warning>
+
+## Technical Details
+
+### Update API Endpoint
+
+Updates are handled by the `/api/update` POST endpoint:
+
+- **Method**: POST
+- **Headers**: Optional `x-admin-key` for admin override
+- **Response**: JSON with success status and updated data
+
+### Data Persistence
+
+Successful updates are persisted to disk:
+- Data is written to a JSON file
+- Includes `lastUpdate` timestamp
+- Contains all app and store information
+- Used for cooldown calculations and initial load
+
+### Cooldown Calculation
+
+The cooldown is calculated server-side:
+
+```typescript
+const lastUpdate = new Date(currentData.lastUpdate);
+const diff = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
+
+if (diff < COOLDOWN_MINUTES) {
+  // Rate limit error
+}
+```
+
+<Tip>
+  The timestamp format is ISO 8601 (e.g., "2026-03-13T15:57:12.537Z") for accurate time calculations.
+</Tip>

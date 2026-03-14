@@ -1,0 +1,284 @@
+---
+title: 'Deployment'
+description: 'Deploy your Kids&Us App Versions dashboard to production'
+---
+
+## Overview
+
+The Kids&Us App Versions dashboard is built with Next.js and can be deployed to various platforms. This guide covers deployment to Netlify (recommended) and Vercel.
+
+## Production Build
+
+Before deploying, always create an optimized production build to ensure best performance:
+
+<CodeGroup>
+  ```bash npm
+  npm run build
+  ```
+
+  ```bash yarn
+  yarn build
+  ```
+
+  ```bash pnpm
+  pnpm build
+  ```
+</CodeGroup>
+
+This command:
+- Compiles TypeScript to JavaScript
+- Optimizes React components for production
+- Bundles and minifies CSS with Tailwind
+- Generates static assets in the `.next` directory
+- Performs build-time validation and type checking
+
+<Note>
+  The build process includes pre-commit hooks that run ESLint, Prettier, and Vitest to ensure code quality. All checks must pass before deployment.
+</Note>
+
+## Deploy to Netlify
+
+Netlify is the recommended deployment platform for this project. The live production site runs on Netlify at [kidsandus-app-versions.netlify.app](https://kidsandus-app-versions.netlify.app/).
+
+### Quick Deploy
+
+<Steps>
+  <Step title="Connect your repository">
+    1. Log in to [Netlify](https://netlify.com)
+    2. Click **Add new site** → **Import an existing project**
+    3. Connect your GitHub account and select the `kidsandus-app-versions` repository
+  </Step>
+
+  <Step title="Configure build settings">
+    Netlify should auto-detect Next.js. Verify these settings:
+
+    - **Build command**: `npm run build`
+    - **Publish directory**: `.next`
+    - **Node version**: 18.17.0 or higher
+  </Step>
+
+  <Step title="Configure environment settings">
+    The project includes a `netlify.toml` configuration file with the following settings:
+
+    ```toml
+    [build.environment]
+      SECRETS_SCAN_OMIT_KEYS = "GITHUB_OWNER,GITHUB_REPO"
+    ```
+
+    This configuration ensures sensitive scan keys are omitted from security scans.
+  </Step>
+
+  <Step title="Deploy">
+    Click **Deploy site**. Netlify will:
+    - Install dependencies
+    - Run the build command
+    - Deploy your site to a production URL
+    - Provide automatic HTTPS
+  </Step>
+</Steps>
+
+### Continuous Deployment
+
+Once connected, Netlify automatically deploys:
+- **Production**: When you push to the `main` branch
+- **Preview**: When you open a pull request
+
+<Tip>
+  Enable branch deploys in Netlify settings to preview changes before merging to production.
+</Tip>
+
+## Deploy to Vercel
+
+Vercel is an excellent alternative platform, especially for Next.js applications.
+
+### Quick Deploy
+
+<Steps>
+  <Step title="Connect your repository">
+    1. Log in to [Vercel](https://vercel.com)
+    2. Click **Add New** → **Project**
+    3. Import the `kidsandus-app-versions` repository from GitHub
+  </Step>
+
+  <Step title="Configure build settings">
+    Vercel auto-detects Next.js projects. Verify:
+
+    - **Framework Preset**: Next.js
+    - **Build Command**: `npm run build`
+    - **Output Directory**: `.next`
+    - **Install Command**: `npm install`
+  </Step>
+
+  <Step title="Deploy">
+    Click **Deploy**. Vercel will:
+    - Build your application
+    - Deploy to a production URL
+    - Set up automatic HTTPS
+    - Configure edge network CDN
+  </Step>
+</Steps>
+
+### Continuous Deployment
+
+Vercel automatically deploys:
+- **Production**: Commits to the `main` branch
+- **Preview**: Every pull request and branch
+
+## Environment Configuration
+
+This project does not require environment variables for basic operation. The dashboard reads data from the local `data.json` file.
+
+<Note>
+  If you customize the project to use external APIs or services, you may need to configure environment variables through your deployment platform's dashboard.
+</Note>
+
+### Adding Environment Variables (If Needed)
+
+**Netlify:**
+1. Go to **Site settings** → **Environment variables**
+2. Add your variables
+3. Redeploy the site
+
+**Vercel:**
+1. Go to **Settings** → **Environment Variables**
+2. Add your variables
+3. Redeploy or they'll apply on next deployment
+
+## Data Updates
+
+The `data.json` file contains app version information and is included in the repository. Updates to this file will trigger automatic redeployment:
+
+1. Edit `data.json` with new version information
+2. Commit and push changes to your repository
+3. Your deployment platform automatically rebuilds and deploys
+
+<Warning>
+  Always validate your `data.json` file before committing. Invalid JSON will cause build failures.
+</Warning>
+
+## Custom Domain
+
+### Netlify
+
+1. Go to **Domain settings** → **Add custom domain**
+2. Enter your domain name
+3. Configure DNS records as instructed
+4. Netlify provides free SSL certificates automatically
+
+### Vercel
+
+1. Go to **Settings** → **Domains**
+2. Add your custom domain
+3. Update DNS records with your provider
+4. SSL certificates are provisioned automatically
+
+## Performance Optimization
+
+The build process automatically includes:
+
+- **Code splitting**: Reduces initial bundle size
+- **Image optimization**: Next.js automatically optimizes images
+- **CSS optimization**: Tailwind CSS purges unused styles
+- **Minification**: JavaScript and CSS are minified
+- **Caching**: Static assets are cached with optimal headers
+
+## Troubleshooting
+
+### Build Failures
+
+**TypeScript errors:**
+```bash
+npm run lint
+```
+Fix any errors shown before deploying.
+
+**Dependency issues:**
+```bash
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+```
+
+**Test failures:**
+```bash
+npm test
+```
+Ensure all tests pass before deploying.
+
+### Pre-commit Hook Failures
+
+The project uses Husky to enforce code quality:
+- **Linting**: Code must pass ESLint checks
+- **Formatting**: Code must be formatted with Prettier
+- **Tests**: All Vitest tests must pass
+- **Commit messages**: Must follow [Conventional Commits](https://www.conventionalcommits.org/) format
+
+If commits are blocked, fix the reported issues and try again.
+
+### Deployment Platform Issues
+
+**Netlify build timeout:**
+- Check build logs for errors
+- Verify Node.js version matches requirements (18.17.0+)
+- Clear cache and retry deployment
+
+**Vercel deployment failed:**
+- Review deployment logs in the Vercel dashboard
+- Ensure no environment variable dependencies are missing
+- Check that the build succeeds locally first
+
+### Runtime Issues
+
+**Dashboard not loading:**
+- Check browser console for JavaScript errors
+- Verify `data.json` is valid JSON
+- Ensure all API routes are responding (check `/api`)
+
+**Data not refreshing:**
+- The refresh feature has a 60-minute cooldown
+- Use the admin override (press `.` key, enter `force`) if needed
+- Check browser network tab for failed requests
+
+## Monitoring
+
+Both platforms provide built-in monitoring:
+
+**Netlify:**
+- Analytics dashboard for traffic and performance
+- Function logs for API routes
+- Deploy logs for troubleshooting builds
+
+**Vercel:**
+- Analytics for Core Web Vitals
+- Real-time logs for serverless functions
+- Deployment history and rollback capabilities
+
+<Tip>
+  Set up deployment notifications in Slack or email to stay informed about build status.
+</Tip>
+
+## Rollback
+
+If a deployment causes issues, both platforms support instant rollback:
+
+**Netlify:**
+1. Go to **Deploys** tab
+2. Find the previous working deployment
+3. Click **Publish deploy**
+
+**Vercel:**
+1. Go to **Deployments** tab
+2. Find the previous working deployment
+3. Click the three dots → **Promote to Production**
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="View Live Demo" icon="globe" href="https://kidsandus-app-versions.netlify.app/">
+    See the production deployment in action
+  </Card>
+  
+  <Card title="Development Setup" icon="bolt" href="/development/setup">
+    Set up local development environment
+  </Card>
+</CardGroup>

@@ -1,0 +1,383 @@
+---
+title: Contributing
+description: Guidelines for contributing to the Kids&Us App Versions project
+---
+
+## Welcome Contributors!
+
+We appreciate your interest in contributing to the Kids&Us App Versions project. This guide will help you understand our development workflow, code quality standards, and how to submit contributions.
+
+<Tip>
+Before starting work on a major feature, please open an issue to discuss your proposal with the maintainers.
+</Tip>
+
+## Getting Started
+
+<Steps>
+  <Step title="Fork the repository">
+    Create your own fork of the repository on GitHub:
+
+    ```bash
+    # Click the 'Fork' button on GitHub, then clone your fork
+    git clone https://github.com/YOUR_USERNAME/kidsandus-app-versions.git
+    cd kidsandus-app-versions
+    ```
+  </Step>
+
+  <Step title="Set up your environment">
+    Install dependencies and set up the development environment:
+
+    ```bash
+    npm install
+    ```
+
+    This will also install Husky git hooks automatically via the `prepare` script.
+  </Step>
+
+  <Step title="Create a feature branch">
+    Create a new branch for your changes:
+
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+
+    **Branch Naming Conventions:**
+    - `feature/` - New features
+    - `fix/` - Bug fixes
+    - `docs/` - Documentation updates
+    - `refactor/` - Code refactoring
+    - `test/` - Test additions or updates
+  </Step>
+
+  <Step title="Make your changes">
+    Develop your feature or fix, following our code quality standards (see below).
+  </Step>
+
+  <Step title="Test your changes">
+    Ensure all tests pass and add new tests for your changes:
+
+    ```bash
+    npm test
+    npm run lint
+    ```
+  </Step>
+
+  <Step title="Commit your changes">
+    Commit using conventional commit messages (enforced by Commitlint):
+
+    ```bash
+    git add .
+    git commit -m "feat: add new scraper for Amazon Appstore"
+    ```
+  </Step>
+
+  <Step title="Push and create a pull request">
+    Push your changes and open a pull request:
+
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+
+    Then open a pull request on GitHub with a clear description of your changes.
+  </Step>
+</Steps>
+
+## Git Workflow
+
+### Husky Git Hooks
+
+The project uses **Husky** to enforce code quality through automated git hooks:
+
+<AccordionGroup>
+  <Accordion title="Pre-commit Hook" icon="shield-check">
+    Runs **before** every commit to ensure code quality:
+
+    ```bash .husky/pre-commit
+    npm run lint
+    npx prettier --check .
+    npx vitest run
+    ```
+
+    **What it checks:**
+    1. **Linting**: Runs ESLint to catch code quality issues
+    2. **Formatting**: Verifies code is formatted with Prettier
+    3. **Testing**: Runs all Vitest tests to prevent regressions
+
+    <Warning>
+    If any of these checks fail, your commit will be **blocked**. Fix the issues before committing.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="Commit Message Hook" icon="message">
+    Validates commit messages using **Commitlint**:
+
+    ```bash .husky/commit-msg
+    npx --no -- commitlint --edit "$1"
+    ```
+
+    Enforces [Conventional Commits](https://www.conventionalcommits.org/) format.
+  </Accordion>
+</AccordionGroup>
+
+### Conventional Commits
+
+All commit messages must follow the Conventional Commits specification:
+
+```text
+type: subject
+
+[optional body]
+
+[optional footer]
+```
+
+#### Commit Types
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `feat` | New feature | `feat: add Huawei AppGallery scraper` |
+| `fix` | Bug fix | `fix: handle empty API responses` |
+| `docs` | Documentation only | `docs: update setup instructions` |
+| `style` | Code style changes | `style: format with prettier` |
+| `refactor` | Code refactoring | `refactor: extract scraper factory` |
+| `test` | Add or update tests | `test: add error handling tests` |
+| `chore` | Maintenance tasks | `chore: update dependencies` |
+| `perf` | Performance improvements | `perf: optimize scraper caching` |
+| `ci` | CI/CD changes | `ci: add GitHub Actions workflow` |
+
+#### Commit Message Examples
+
+<CodeGroup>
+```text Good Examples
+feat: add dark mode toggle component
+
+fix: resolve version parsing for Microsoft Store
+
+docs: update contributing guidelines
+
+test: add coverage for date utilities
+
+refactor: simplify schema validation logic
+```
+
+```text Bad Examples ❌
+added new feature
+
+Fix bug
+
+Updated files
+
+WIP
+
+various changes
+```
+</CodeGroup>
+
+<Info>
+Commitlint is configured in `.commitlintrc.js` and uses the `@commitlint/config-conventional` preset.
+</Info>
+
+## Code Quality Standards
+
+### ESLint
+
+The project uses ESLint with Next.js and Prettier configurations:
+
+```bash
+# Check for linting errors
+npm run lint
+
+# Some errors can be auto-fixed
+npm run lint -- --fix
+```
+
+**Key Rules:**
+- Next.js best practices (from `eslint-config-next`)
+- React hooks rules
+- TypeScript strict mode
+- No unused variables or imports
+- Prettier compatibility (from `eslint-config-prettier`)
+
+### Prettier
+
+Code formatting is enforced using Prettier:
+
+```bash
+# Check formatting
+npx prettier --check .
+
+# Auto-format all files
+npx prettier --write .
+```
+
+**Configuration** (`.prettierrc`):
+- Single quotes for strings
+- 2-space indentation
+- Tailwind CSS class sorting (via `prettier-plugin-tailwindcss`)
+
+<Tip>
+Configure your editor to format on save with Prettier for the best experience.
+</Tip>
+
+### TypeScript
+
+All code must be properly typed:
+
+- Use TypeScript's strict mode
+- Define interfaces for data structures
+- Avoid `any` type - use `unknown` or proper types
+- Leverage Zod schemas for runtime validation
+
+```typescript
+// Good: Properly typed
+interface AppVersion {
+  version: string;
+  lastUpdated: Date;
+}
+
+function getVersion(app: AppVersion): string {
+  return app.version;
+}
+
+// Bad: Using 'any'
+function getVersion(app: any) {
+  return app.version;
+}
+```
+
+### Testing Requirements
+
+All new features and bug fixes should include tests:
+
+1. **Unit Tests**: For business logic, scrapers, and utilities
+2. **Error Handling**: Test both success and failure paths
+3. **Mocking**: Mock external dependencies (fetch, APIs)
+4. **Coverage**: Aim for high coverage of critical paths
+
+```bash
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Generate coverage report
+npm test -- --coverage
+```
+
+See the [Testing Guide](/development/testing) for detailed examples.
+
+## Pull Request Guidelines
+
+### Before Submitting
+
+<Checklist>
+  - [ ] All tests pass (`npm test`)
+  - [ ] Linting passes (`npm run lint`)
+  - [ ] Code is formatted with Prettier
+  - [ ] New tests added for new features
+  - [ ] Commit messages follow Conventional Commits
+  - [ ] Documentation updated (if needed)
+  - [ ] No merge conflicts with main branch
+</Checklist>
+
+### PR Description Template
+
+Use this template for your pull request description:
+
+```markdown
+## Description
+[Brief description of what this PR does]
+
+## Type of Change
+- [ ] Bug fix
+- [ ] New feature
+- [ ] Documentation update
+- [ ] Refactoring
+- [ ] Performance improvement
+
+## Related Issues
+Fixes #[issue number]
+
+## Testing
+- [ ] Unit tests added/updated
+- [ ] Manual testing performed
+
+## Screenshots (if applicable)
+[Add screenshots for UI changes]
+
+## Checklist
+- [ ] Code follows project conventions
+- [ ] All tests pass
+- [ ] Documentation updated
+```
+
+### Review Process
+
+1. **Automated Checks**: GitHub Actions will run tests and linting
+2. **Code Review**: Maintainers will review your code
+3. **Feedback**: Address any requested changes
+4. **Approval**: Once approved, your PR will be merged
+
+<Note>
+Be patient during the review process. Maintainers may take a few days to review your contribution.
+</Note>
+
+## Development Best Practices
+
+### Code Organization
+
+- Keep components small and focused
+- Separate business logic from presentation
+- Use custom hooks for reusable stateful logic
+- Follow the established directory structure
+
+### Performance
+
+- Use React Server Components where possible
+- Minimize client-side JavaScript
+- Optimize images using Next.js Image component
+- Lazy load components when appropriate
+
+### Accessibility
+
+- Use semantic HTML elements
+- Ensure keyboard navigation works
+- Include proper ARIA labels
+- Test with screen readers
+
+### Security
+
+- Never commit sensitive data (API keys, secrets)
+- Validate all external data with Zod schemas
+- Sanitize user inputs
+- Follow Next.js security best practices
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/marcundertest/kidsandus-app-versions/issues">
+    Report bugs or request features
+  </Card>
+  <Card title="Discussions" icon="messages" href="https://github.com/marcundertest/kidsandus-app-versions/discussions">
+    Ask questions and share ideas
+  </Card>
+  <Card title="Documentation" icon="book" href="/introduction">
+    Browse the full documentation
+  </Card>
+  <Card title="Code of Conduct" icon="handshake">
+    Be respectful and professional
+  </Card>
+</CardGroup>
+
+## License
+
+By contributing to this project, you agree that your contributions will be licensed under the MIT License.
+
+<Info>
+This project follows the [MIT License](https://opensource.org/licenses/MIT). See the LICENSE file for details.
+</Info>
+
+---
+
+**Thank you for contributing to Kids&Us App Versions!** Your efforts help make this project better for everyone. 🙌

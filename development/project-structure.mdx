@@ -1,0 +1,231 @@
+---
+title: Project Structure
+description: Understanding the codebase organization and architecture
+---
+
+## Overview
+
+The Kids&Us App Versions project follows Next.js 16 conventions with the App Router. The codebase is organized for clarity, maintainability, and scalability.
+
+## Directory Layout
+
+```text
+kidsandus-app-versions/
+├── .husky/                 # Git hooks (pre-commit, commit-msg)
+├── public/                 # Static assets
+├── src/                    # Source code
+│   ├── app/               # Next.js App Router
+│   ├── components/        # React components
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Business logic and utilities
+│   └── tests/             # Test files
+├── data.json              # App version data store
+├── package.json           # Dependencies and scripts
+├── tsconfig.json          # TypeScript configuration
+├── vitest.config.mts      # Vitest test configuration
+└── Configuration files    # ESLint, Prettier, Next.js, etc.
+```
+
+## Core Directories
+
+<AccordionGroup>
+  <Accordion title="src/app/ - Next.js Application">
+    The `app/` directory contains the Next.js App Router structure:
+
+    ```text
+    src/app/
+    ├── [lang]/              # Dynamic language routing
+    │   ├── layout.tsx      # Root layout with providers
+    │   └── page.tsx        # Dashboard page
+    └── api/                # API routes
+        └── route.ts        # GET /api endpoint
+    ```
+
+    **Key Features:**
+    - **Dynamic Routing**: `[lang]` segment enables internationalization
+    - **Layouts**: Shared UI structure with theme and language providers
+    - **API Routes**: Server-side endpoints for data access
+    - **Server Components**: Default server-side rendering for optimal performance
+  </Accordion>
+
+  <Accordion title="src/components/ - React Components">
+    Reusable UI components following atomic design principles:
+
+    ```text
+    src/components/
+    ├── ui/                  # Shadcn/ui base components
+    │   ├── button.tsx
+    │   ├── sheet.tsx
+    │   ├── skeleton.tsx
+    │   └── table.tsx
+    ├── DashboardTable.tsx   # Main version table
+    ├── Footer.tsx           # App footer
+    ├── ThemeToggle.tsx      # Dark/light mode switcher
+    ├── UpdateControl.tsx    # Data refresh controls
+    └── VersionBadge.tsx     # Version display badge
+    ```
+
+    **Component Types:**
+    - **UI Components**: Low-level, reusable components from Shadcn/ui
+    - **Feature Components**: Business-specific components like `DashboardTable`
+    - **Layout Components**: Structural components like `Footer`
+  </Accordion>
+
+  <Accordion title="src/lib/ - Business Logic & Utilities">
+    Core application logic separated from presentation:
+
+    ```text
+    src/lib/
+    ├── scrapers/            # Store-specific scrapers
+    │   ├── app-store.ts    # iTunes App Store scraper
+    │   ├── google-play.ts  # Google Play Store scraper
+    │   ├── huawei.ts       # Huawei AppGallery scraper
+    │   ├── microsoft-store.ts # Microsoft Store scraper
+    │   ├── factory.ts      # Scraper factory pattern
+    │   ├── service.ts      # Scraper orchestration
+    │   └── types.ts        # Scraper type definitions
+    ├── utils/               # Utility functions
+    ├── config.ts            # App configuration
+    ├── schemas.ts           # Zod validation schemas
+    ├── types.ts             # TypeScript type definitions
+    └── utils.ts             # General utilities
+    ```
+
+    **Key Modules:**
+    - **Scrapers**: Extract version data from different app stores
+    - **Schemas**: Runtime validation using Zod for API responses
+    - **Utils**: Helper functions for dates, formatting, etc.
+    - **Config**: Centralized configuration management
+  </Accordion>
+
+  <Accordion title="src/hooks/ - Custom React Hooks">
+    Reusable stateful logic:
+
+    ```text
+    src/hooks/
+    └── use-theme.ts         # Theme management hook
+    ```
+
+    Custom hooks encapsulate common patterns and state management logic.
+  </Accordion>
+
+  <Accordion title="src/tests/ - Test Files">
+    Comprehensive test coverage using Vitest:
+
+    ```text
+    src/tests/
+    ├── setup.ts             # Test environment configuration
+    └── unit/                # Unit tests
+        ├── scrapers/        # Scraper tests
+        │   ├── app-store.test.ts
+        │   ├── google-play.test.ts
+        │   ├── huawei.test.ts
+        │   └── microsoft-store.test.ts
+        └── utils/           # Utility tests
+            ├── date.test.ts
+            └── github-storage.test.ts
+    ```
+
+    **Test Organization:**
+    - Tests mirror the `src/` directory structure
+    - Each module has corresponding test files
+    - Setup file configures test environment (mocks, globals)
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Files
+
+<CardGroup cols={2}>
+  <Card title="tsconfig.json" icon="code">
+    TypeScript compiler configuration with strict mode enabled and path aliases (`@/*` → `./src/*`).
+  </Card>
+  <Card title="vitest.config.mts" icon="flask">
+    Vitest test runner configuration with jsdom environment and React plugin.
+  </Card>
+  <Card title="eslint.config.mjs" icon="check">
+    ESLint rules for code quality and Next.js best practices.
+  </Card>
+  <Card title=".prettierrc" icon="paintbrush">
+    Code formatting rules for consistent style.
+  </Card>
+  <Card title="next.config.ts" icon="gear">
+    Next.js framework configuration for routing, images, and build optimization.
+  </Card>
+  <Card title="components.json" icon="cube">
+    Shadcn/ui configuration for component aliases and paths.
+  </Card>
+</CardGroup>
+
+## Data Storage
+
+### data.json
+
+The `data.json` file at the project root serves as the primary data source:
+
+```json
+[
+  {
+    "id": "unique-id",
+    "name": "App Name",
+    "store": "itunes",
+    "version": "1.0.0",
+    "lastUpdated": "2024-03-14T12:00:00Z",
+    "icon": "https://..."
+  }
+]
+```
+
+**Characteristics:**
+- Simple JSON file for data persistence
+- Read by the `/api` route
+- Updated by scraper services
+- Version controlled for tracking changes
+
+## Architecture Patterns
+
+### Factory Pattern
+
+The scraper system uses the Factory pattern (`scrapers/factory.ts`) to instantiate store-specific scrapers:
+
+```typescript
+// Simplified example
+const scraper = ScraperFactory.create(storeType);
+const result = await scraper.scrape(config);
+```
+
+### Service Layer
+
+Business logic is separated into service modules (`scrapers/service.ts`) that orchestrate multiple operations.
+
+### Schema Validation
+
+Zod schemas validate external data at runtime, ensuring type safety beyond TypeScript's compile-time checks:
+
+```typescript
+import { z } from 'zod';
+import { AppStoreSchema } from '@/lib/schemas';
+
+const data = AppStoreSchema.parse(apiResponse);
+```
+
+## Import Aliases
+
+The project uses TypeScript path aliases for cleaner imports:
+
+```typescript
+// Instead of: import { scraper } from '../../../lib/scrapers/factory'
+import { scraper } from '@/lib/scrapers/factory';
+```
+
+The `@/` alias maps to `./src/` as configured in `tsconfig.json`.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Setup Guide" icon="rocket" href="/development/setup">
+    Get your development environment running
+  </Card>
+  <Card title="Testing" icon="flask" href="/development/testing">
+    Learn about the testing strategy
+  </Card>
+</CardGroup>

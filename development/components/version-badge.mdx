@@ -1,0 +1,410 @@
+---
+title: 'VersionBadge Component'
+description: 'Interactive badge component for displaying and copying version numbers'
+icon: 'tag'
+---
+
+## Overview
+
+The `VersionBadge` component is a specialized badge that displays app version numbers with click-to-copy functionality. It provides visual feedback when a version is copied to the clipboard, enhancing the user experience when working with version information.
+
+**Location**: `src/components/VersionBadge.tsx`
+
+## Purpose
+
+The VersionBadge component:
+
+- Displays version numbers in a styled badge format
+- Provides one-click copying of version strings to clipboard
+- Shows visual confirmation when version is copied
+- Uses monospace font for better version number readability
+- Integrates seamlessly with the DashboardTable component
+
+## Props
+
+<ParamField path="version" type="string" required>
+  The version string to display (e.g., "1.2.3", "2.0.0-beta.1")
+</ParamField>
+
+<ParamField path="className" type="string">
+  Optional CSS classes to customize the badge appearance. These are merged with the default styles using the `cn()` utility.
+</ParamField>
+
+## TypeScript Interface
+
+```tsx src/components/VersionBadge.tsx
+interface VersionBadgeProps {
+  version: string;
+  className?: string;
+}
+```
+
+## Implementation
+
+### Component Structure
+
+The component is a client-side component (marked with `'use client'`) that manages its own state for the copy feedback:
+
+```tsx src/components/VersionBadge.tsx
+'use client';
+
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Check } from 'lucide-react';
+
+export function VersionBadge({ version, className }: VersionBadgeProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(version);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1000);
+    } catch (err) {
+      console.error('Failed to copy version:', err);
+    }
+  };
+
+  return (
+    <Badge
+      variant="secondary"
+      className={cn(
+        'hover:bg-muted-foreground/20 cursor-pointer transition-all duration-200 active:scale-95',
+        copied && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+        className
+      )}
+      onClick={handleCopy}
+      title="Click to copy version"
+    >
+      <span className={cn('flex items-center gap-1.5', copied && 'font-semibold')}>
+        {copied ? (
+          <>
+            <Check className="h-3 w-3" />
+            Copied!
+          </>
+        ) : (
+          version
+        )}
+      </span>
+    </Badge>
+  );
+}
+```
+
+### Copy Functionality
+
+The component uses the Clipboard API to copy version text:
+
+```tsx
+const handleCopy = async () => {
+  try {
+    await navigator.clipboard.writeText(version);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1000);
+  } catch (err) {
+    console.error('Failed to copy version:', err);
+  }
+};
+```
+
+**Key features:**
+- Uses `navigator.clipboard.writeText()` for copying
+- Sets `copied` state to `true` immediately after copy
+- Resets `copied` state after 1 second
+- Includes error handling for clipboard access failures
+
+### Visual States
+
+The component has two visual states:
+
+1. **Normal State**: Displays the version number
+   - Uses secondary badge variant
+   - Shows hover effect
+   - Includes "Click to copy version" tooltip
+
+2. **Copied State**: Shows confirmation
+   - Changes background to green
+   - Displays checkmark icon
+   - Shows "Copied!" text
+   - Makes text bold
+
+## Styling
+
+### Base Styles
+
+The component uses the Shadcn Badge component with custom styling:
+
+```tsx
+<Badge
+  variant="secondary"
+  className={cn(
+    'hover:bg-muted-foreground/20 cursor-pointer transition-all duration-200 active:scale-95',
+    copied && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    className
+  )}
+>
+```
+
+**Style breakdown:**
+- `hover:bg-muted-foreground/20`: Hover effect with 20% opacity
+- `cursor-pointer`: Indicates the badge is clickable
+- `transition-all duration-200`: Smooth transitions for state changes
+- `active:scale-95`: Slight scale down when clicked for tactile feedback
+
+### Copied State Styles
+
+When copied, the badge applies green styling:
+
+- **Light mode**: `bg-green-100 text-green-700`
+- **Dark mode**: `dark:bg-green-900/30 dark:text-green-400`
+- **Font weight**: `font-semibold` for the text
+
+### Custom Styling via className
+
+The component accepts custom classes that are merged with default styles:
+
+```tsx
+<VersionBadge
+  version="1.2.3"
+  className="rounded-full px-2 py-0.5 font-mono text-xs"
+/>
+```
+
+## Usage Examples
+
+### Basic Usage
+
+```tsx
+import { VersionBadge } from '@/components/VersionBadge';
+
+function MyComponent() {
+  return <VersionBadge version="1.2.3" />;
+}
+```
+
+### With Custom Styling
+
+```tsx
+<VersionBadge
+  version="2.0.0"
+  className="font-mono text-sm rounded-md"
+/>
+```
+
+### In DashboardTable
+
+The VersionBadge is used in the DashboardTable component:
+
+```tsx src/components/DashboardTable.tsx
+{store.version !== 'N/A' ? (
+  <VersionBadge
+    version={store.version}
+    className="rounded-[calc(var(--radius)-2px)] px-2 py-0.5 font-mono text-[0.6875rem]"
+  />
+) : (
+  <span className="text-muted-foreground text-[0.6875rem] italic">N/A</span>
+)}
+```
+
+### Multiple Badges
+
+```tsx
+function VersionList({ versions }: { versions: string[] }) {
+  return (
+    <div className="flex gap-2">
+      {versions.map((version, index) => (
+        <VersionBadge key={index} version={version} />
+      ))}
+    </div>
+  );
+}
+```
+
+## Accessibility
+
+The component includes several accessibility features:
+
+<AccordionGroup>
+  <Accordion title="Tooltip">
+    The `title` attribute provides a tooltip indicating the badge is clickable:
+    ```tsx
+    title="Click to copy version"
+    ```
+  </Accordion>
+
+  <Accordion title="Interactive Element">
+    Uses a `<button>` element (via Badge) for proper keyboard accessibility.
+  </Accordion>
+
+  <Accordion title="Visual Feedback">
+    Provides clear visual feedback for both hover and copied states, ensuring users know the action was successful.
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    Handles clipboard permission errors gracefully without breaking the UI.
+  </Accordion>
+</AccordionGroup>
+
+## Browser Compatibility
+
+The Clipboard API is supported in all modern browsers:
+
+- Chrome/Edge 63+
+- Firefox 53+
+- Safari 13.1+
+
+**Note**: The Clipboard API requires a secure context (HTTPS or localhost).
+
+### Fallback Considerations
+
+For older browsers, you might want to implement a fallback:
+
+```tsx
+const handleCopy = async () => {
+  try {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(version);
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = version;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1000);
+  } catch (err) {
+    console.error('Failed to copy version:', err);
+  }
+};
+```
+
+## Variants
+
+### Size Variants
+
+You can customize the size using the `className` prop:
+
+```tsx
+{/* Small */}
+<VersionBadge
+  version="1.0.0"
+  className="text-[10px] px-1.5 py-0.5"
+/>
+
+{/* Medium (default) */}
+<VersionBadge version="1.0.0" />
+
+{/* Large */}
+<VersionBadge
+  version="1.0.0"
+  className="text-sm px-3 py-1"
+/>
+```
+
+### Shape Variants
+
+```tsx
+{/* Rounded */}
+<VersionBadge
+  version="1.0.0"
+  className="rounded-full"
+/>
+
+{/* Square */}
+<VersionBadge
+  version="1.0.0"
+  className="rounded-md"
+/>
+
+{/* Pill */}
+<VersionBadge
+  version="1.0.0"
+  className="rounded-[calc(var(--radius)-2px)]"
+/>
+```
+
+## Dependencies
+
+The VersionBadge component depends on:
+
+- **React**: `useState` hook for state management
+- **Shadcn Badge**: Base badge component
+- **Lucide React**: Check icon for copied state
+- **Utils**: `cn()` utility for class merging
+
+```tsx src/components/VersionBadge.tsx
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { Check } from 'lucide-react';
+```
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="State Management">
+    Uses local state (`useState`) for the copied indicator, avoiding unnecessary prop drilling or global state management.
+  </Accordion>
+
+  <Accordion title="Timeout Cleanup">
+    The 1-second timeout for resetting the copied state is simple and doesn't require cleanup since the state change is safe even if the component unmounts.
+  </Accordion>
+
+  <Accordion title="Animation Performance">
+    Uses CSS transitions and transforms which are GPU-accelerated for smooth animations:
+    - `transition-all duration-200`
+    - `active:scale-95`
+  </Accordion>
+
+  <Accordion title="Conditional Rendering">
+    Efficiently switches between version text and copied state without re-rendering parent components.
+  </Accordion>
+</AccordionGroup>
+
+## Testing Considerations
+
+When testing this component:
+
+1. **Mock Clipboard API**: The Clipboard API needs to be mocked in tests
+   ```tsx
+   Object.assign(navigator, {
+     clipboard: {
+       writeText: jest.fn(() => Promise.resolve()),
+     },
+   });
+   ```
+
+2. **Test Copied State**: Verify the copied state appears and disappears
+   ```tsx
+   await userEvent.click(badge);
+   expect(screen.getByText('Copied!')).toBeInTheDocument();
+   await waitFor(() => {
+     expect(screen.queryByText('Copied!')).not.toBeInTheDocument();
+   }, { timeout: 1100 });
+   ```
+
+3. **Test Error Handling**: Simulate clipboard access failure
+   ```tsx
+   navigator.clipboard.writeText = jest.fn(() => Promise.reject());
+   ```
+
+## Related Components
+
+<CardGroup cols={2}>
+  <Card title="DashboardTable" icon="table" href="./dashboard-table">
+    Main consumer of the VersionBadge component
+  </Card>
+  <Card title="Badge" icon="tag" href="./ui-components#badge">
+    Base Shadcn badge component
+  </Card>
+  <Card title="UI Components" icon="palette" href="./ui-components">
+    Complete UI component library reference
+  </Card>
+  <Card title="Project Structure" icon="sitemap" href="../project-structure">
+    Overall project architecture and organization
+  </Card>
+</CardGroup>

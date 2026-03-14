@@ -1,0 +1,136 @@
+---
+title: 'Force Update (Admin Bypass)'
+description: 'Learn how to bypass the rate limit using the secret admin key feature'
+icon: 'key'
+---
+
+## Overview
+
+The Kids&Us App Versions dashboard includes a hidden admin feature that allows authorized users to bypass the 60-minute rate limit and force an immediate data refresh. This is useful for testing, urgent updates, or administrative maintenance.
+
+<Warning>
+  The admin key feature is a security-sensitive function. Only share the admin key with trusted team members who need immediate update access.
+</Warning>
+
+## Secret Keyboard Shortcut
+
+The admin bypass is triggered using a hidden keyboard shortcut:
+
+<Steps>
+  <Step title="Press the dot key">
+    Press the `.` (dot/period) key anywhere on the page when not typing in a text box.
+  </Step>
+  
+  <Step title="Enter admin key">
+    A dialog will appear prompting you for the Admin Key.
+  </Step>
+  
+  <Step title="Submit the key">
+    Enter the admin key (default: `force`) and submit to force an immediate update.
+  </Step>
+</Steps>
+
+## Default Admin Key
+
+The default admin key is hardcoded in the API route:
+
+```typescript src/app/api/update/route.ts
+const ADMIN_SECRET = 'force';
+```
+
+<Warning>
+  In production environments, you should change this default value to a stronger, unique secret key. Consider using environment variables instead of hardcoded values.
+</Warning>
+
+## How the Bypass Works
+
+When you provide the admin key, it's sent as an HTTP header to the update API:
+
+```typescript src/app/api/update/route.ts
+const adminKey = typeof request !== 'undefined' ? request.headers.get('x-admin-key') : null;
+
+// Strict check: If header exists (even empty) but is wrong, deny immediately
+if (adminKey !== null && adminKey !== ADMIN_SECRET) {
+  return NextResponse.json({ success: false, error: 'Invalid Admin Key' }, { status: 401 });
+}
+const isForceUpdate = adminKey === ADMIN_SECRET;
+```
+
+The API performs a strict validation:
+- If the `x-admin-key` header is present but incorrect, the request is denied with a 401 error
+- If the key matches `ADMIN_SECRET`, the `isForceUpdate` flag is set to `true`
+- When `isForceUpdate` is true, the rate limit check is skipped entirely
+
+## When to Use Force Update
+
+Use the admin bypass in these scenarios:
+
+- **Testing**: Verifying that data scraping works correctly without waiting
+- **Urgent Updates**: When you need to refresh data immediately due to a critical app release
+- **Maintenance**: Debugging issues with the update mechanism
+- **Initial Setup**: Populating data for the first time or after system changes
+
+<Note>
+  Avoid using force update for routine operations. The rate limit exists to prevent API spam and excessive load on external store APIs.
+</Note>
+
+## Security Implications
+
+<Warning>
+  **Security Best Practices:**
+  
+  1. **Change the default key**: The default value `force` is publicly visible in the source code
+  2. **Use environment variables**: Store the admin secret in `.env.local` instead of hardcoding it
+  3. **Rotate keys regularly**: Change the admin key periodically, especially if it may have been exposed
+  4. **Limit access**: Only share the admin key with team members who absolutely need it
+  5. **Monitor usage**: Log admin bypass attempts to detect unauthorized access
+  6. **Consider IP restrictions**: Add additional security layers like IP whitelisting for admin features
+</Warning>
+
+## Error Handling
+
+If you provide an incorrect admin key, you'll receive an error response:
+
+```json
+{
+  "success": false,
+  "error": "Invalid Admin Key"
+}
+```
+
+This returns an HTTP 401 (Unauthorized) status code, indicating authentication failure.
+
+## Implementation Reference
+
+The complete admin key logic from `src/app/api/update/route.ts:12-19`:
+
+```typescript
+const ADMIN_SECRET = 'force';
+const adminKey = typeof request !== 'undefined' ? request.headers.get('x-admin-key') : null;
+
+// Strict check: If header exists (even empty) but is wrong, deny immediately
+if (adminKey !== null && adminKey !== ADMIN_SECRET) {
+  return NextResponse.json({ success: false, error: 'Invalid Admin Key' }, { status: 401 });
+}
+const isForceUpdate = adminKey === ADMIN_SECRET;
+```
+
+The rate limit bypass from `src/app/api/update/route.ts:21`:
+
+```typescript
+if (currentData?.lastUpdate && !isForceUpdate) {
+  // Rate limit check is only performed if NOT a force update
+  const lastUpdate = new Date(currentData.lastUpdate);
+  const diff = (new Date().getTime() - lastUpdate.getTime()) / (1000 * 60);
+
+  if (diff < COOLDOWN_MINUTES) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: `Rate limit: Please wait ${COOLDOWN_MINUTES} minutes between updates`,
+      },
+      { status: 429 }
+    );
+  }
+}
+```

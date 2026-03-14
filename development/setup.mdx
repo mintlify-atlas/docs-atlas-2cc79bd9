@@ -1,0 +1,148 @@
+---
+title: Local Development Setup
+description: Get started with the Kids&Us App Versions project on your local machine
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+- **Node.js**: Version 18.17.0 or higher
+- **npm**: Node Package Manager (included with Node.js)
+- **Git**: For cloning the repository
+
+<Tip>
+You can verify your Node.js version by running `node --version` in your terminal.
+</Tip>
+
+## Installation
+
+<Steps>
+  <Step title="Clone the repository">
+    Clone the Kids&Us App Versions repository to your local machine:
+
+    <CodeGroup>
+    ```bash SSH
+    git clone git@github.com:marcundertest/kidsandus-app-versions.git
+    cd kidsandus-app-versions
+    ```
+
+    ```bash HTTPS
+    git clone https://github.com/marcundertest/kidsandus-app-versions.git
+    cd kidsandus-app-versions
+    ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Install dependencies">
+    Install all required project dependencies using npm:
+
+    ```bash
+    npm install
+    ```
+
+    This will install all packages listed in `package.json`, including:
+    - Next.js 16.1.6
+    - React 19.2.3
+    - TypeScript 5
+    - Tailwind CSS 4
+    - Vitest for testing
+    - And all other dependencies
+  </Step>
+
+  <Step title="Start the development server">
+    Launch the Next.js development server:
+
+    ```bash
+    npm run dev
+    ```
+
+    The application will start on `http://localhost:3000` (or the next available port if 3000 is in use).
+  </Step>
+
+  <Step title="Open in browser">
+    Open your web browser and navigate to:
+
+    ```
+    http://localhost:3000
+    ```
+
+    You should see the Kids&Us App Versions dashboard running locally.
+  </Step>
+</Steps>
+
+<Check>
+If everything is set up correctly, you'll see the app versions dashboard with theme switching and language options.
+</Check>
+
+## Environment Configuration
+
+This project does not require any environment variables for basic local development. All app version data is stored in the `data.json` file at the root of the project.
+
+<Note>
+For production deployments or if you're working with the admin features, you may need to configure additional settings. See the deployment documentation for more details.
+</Note>
+
+## Available Scripts
+
+The following npm scripts are available for development:
+
+| Script | Command | Description |
+|--------|---------|-------------|
+| **Development** | `npm run dev` | Starts the Next.js development server with hot reload |
+| **Build** | `npm run build` | Creates an optimized production build |
+| **Start** | `npm run start` | Runs the production server (requires `npm run build` first) |
+| **Lint** | `npm run lint` | Runs ESLint to check code quality |
+| **Test** | `npm test` | Runs the Vitest test suite |
+| **Prepare** | `npm run prepare` | Installs Husky git hooks (runs automatically after install) |
+
+### Development Workflow
+
+<CodeGroup>
+```bash Start Development
+# Start the dev server
+npm run dev
+```
+
+```bash Check Code Quality
+# Run linter
+npm run lint
+
+# Run tests
+npm test
+```
+
+```bash Production Build
+# Build for production
+npm run build
+
+# Start production server
+npm run start
+```
+</CodeGroup>
+
+## Development Server Features
+
+When running the development server, you get:
+
+- **Hot Module Replacement (HMR)**: Changes to your code automatically refresh in the browser
+- **Fast Refresh**: React components update without losing state
+- **Error Overlay**: Detailed error messages displayed directly in the browser
+- **TypeScript Type Checking**: Instant feedback on type errors
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Project Structure" icon="folder-tree" href="/development/project-structure">
+    Learn about the codebase organization
+  </Card>
+  <Card title="Testing" icon="flask" href="/development/testing">
+    Understand the testing strategy
+  </Card>
+  <Card title="Contributing" icon="code-branch" href="/development/contributing">
+    Contribution guidelines and workflows
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/data">
+    Explore the API endpoints
+  </Card>
+</CardGroup>

@@ -1,0 +1,244 @@
+---
+title: 'App Store Scraper'
+description: 'iTunes API integration for fetching iOS and macOS app version data'
+icon: 'apple'
+---
+
+## Overview
+
+The `AppStoreScraper` fetches app version information from Apple's App Store using the official iTunes Search API. This is the most reliable scraper since it uses a public API endpoint rather than web scraping.
+
+**File Location**: `src/lib/scrapers/app-store.ts`
+
+## Implementation
+
+```typescript src/lib/scrapers/app-store.ts
+import { IScraper, ScrapeResult, StoreConfig } from './types';
+import { formatDate } from '../utils/date';
+import { ItunesResponseSchema } from '../schemas';
+
+export class AppStoreScraper implements IScraper {
+  async scrape(config: StoreConfig): Promise<ScrapeResult> {
+    const appId = config.appId;
+    if (!appId) throw new Error('Missing appId');
+
+    const apiUrl = `https://itunes.apple.com/lookup?id=${appId}`;
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const json = await response.json();
+    const parsed = ItunesResponseSchema.safeParse(json);
+
+    if (!parsed.success) {
+      console.error('iTunes API schema validation failed:', parsed.error);
+      throw new Error('Invalid iTunes API response structure');
+    }
+
+    const data = parsed.data;
+
+    if (!data.results || data.results.length === 0) {
+      throw new Error('App not found');
+    }
+
+    const app = data.results[0];
+    return {
+      version: app.version || 'N/A',
+      lastUpdateDate: app.currentVersionReleaseDate
+        ? formatDate(app.currentVersionReleaseDate)
+        : 'N/A',
+      icon: app.artworkUrl512 || app.artworkUrl100 || '',
+    };
+  }
+}
+```
+
+## How It Works
+
+### 1. Configuration
+
+The scraper requires an `appId` (Apple's numeric app identifier) in the `StoreConfig`:
+
+```typescript
+const config: StoreConfig = {
+  id: 'ios-app',
+  type: 'itunes',
+  appId: '1234567890' // Required: Apple's app ID
+};
+```
+
+### 2. API Endpoint
+
+The scraper uses Apple's public iTunes Lookup API:
+
+```
+https://itunes.apple.com/lookup?id={appId}
+```
+
+**Example**: `https://itunes.apple.com/lookup?id=310633997` (WhatsApp)
+
+### 3. API Response Structure
+
+The iTunes API returns a JSON response with app metadata:
+
+```json
+{
+  "resultCount": 1,
+  "results": [
+    {
+      "version": "24.2.78",
+      "currentVersionReleaseDate": "2024-01-15T08:00:00Z",
+      "artworkUrl512": "https://is1-ssl.mzstatic.com/image/thumb/Purple126/v4/...",
+      "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Purple126/v4/...",
+      "bundleId": "net.whatsapp.WhatsApp",
+      "trackName": "WhatsApp Messenger",
+      "description": "...",
+      // ... other fields
+    }
+  ]
+}
+```
+
+### 4. Schema Validation
+
+The scraper validates the response using Zod to ensure type safety:
+
+```typescript src/lib/schemas.ts
+export const ItunesResponseSchema = z.object({
+  results: z.array(
+    z.object({
+      version: z.string().optional(),
+      currentVersionReleaseDate: z.string().optional(),
+      artworkUrl512: z.string().optional(),
+      artworkUrl100: z.string().optional(),
+    })
+  ),
+});
+```
+
+<Accordion title="Why use schema validation?">
+  Schema validation with Zod provides:
+  - **Runtime type safety**: Catches unexpected API response changes
+  - **Error logging**: Helps debug API structure changes
+  - **Type inference**: TypeScript knows the exact shape of `parsed.data`
+  - **Graceful degradation**: Optional fields allow partial data extraction
+</Accordion>
+
+### 5. Data Extraction
+
+The scraper extracts three key pieces of information:
+
+<CodeGroup>
+
+```typescript Version
+version: app.version || 'N/A'
+```
+
+```typescript Last Update Date
+lastUpdateDate: app.currentVersionReleaseDate
+  ? formatDate(app.currentVersionReleaseDate)
+  : 'N/A'
+```
+
+```typescript App Icon
+icon: app.artworkUrl512 || app.artworkUrl100 || ''
+// Prefers high-res 512x512, falls back to 100x100
+```
+
+</CodeGroup>
+
+## Error Handling
+
+The scraper handles multiple error scenarios:
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Missing `appId` | Throws `"Missing appId"` |
+| HTTP error | Throws `"HTTP {status}"` |
+| Invalid schema | Logs error and throws `"Invalid iTunes API response structure"` |
+| Empty results | Throws `"App not found"` |
+| Missing fields | Returns `'N/A'` for that field |
+
+```typescript
+// Example error handling in ScraperService
+try {
+  const scraper = new AppStoreScraper();
+  const result = await scraper.scrape(config);
+  console.log(result);
+  // { version: "24.2.78", lastUpdateDate: "15/01/2024", icon: "https://..." }
+} catch (error) {
+  console.error('Scraping failed:', error.message);
+  // Returns N/A in production
+}
+```
+
+## Date Formatting
+
+The iTunes API returns ISO 8601 dates which are formatted to `DD/MM/YYYY`:
+
+```typescript
+// Input: "2024-01-15T08:00:00Z"
+// Output: "15/01/2024"
+
+formatDate(app.currentVersionReleaseDate)
+```
+
+## Icon Resolution
+
+The scraper supports two icon sizes with fallback logic:
+
+1. **512x512**: `artworkUrl512` (preferred for high-DPI displays)
+2. **100x100**: `artworkUrl100` (fallback)
+3. **Empty string**: If neither is available
+
+```typescript
+icon: app.artworkUrl512 || app.artworkUrl100 || ''
+```
+
+## Usage Example
+
+```typescript
+import { AppStoreScraper } from './lib/scrapers/app-store';
+
+const scraper = new AppStoreScraper();
+
+const result = await scraper.scrape({
+  id: 'whatsapp-ios',
+  type: 'itunes',
+  appId: '310633997'
+});
+
+console.log(result);
+// {
+//   version: "24.2.78",
+//   lastUpdateDate: "15/01/2024",
+//   icon: "https://is1-ssl.mzstatic.com/image/thumb/Purple126/..."
+// }
+```
+
+## Finding App IDs
+
+Apple's app IDs can be found in the App Store URL:
+
+```
+https://apps.apple.com/app/whatsapp-messenger/id310633997
+                                                  ^^^^^^^^^^^
+                                                  App ID
+```
+
+Or use the iTunes Search API to find apps by name:
+
+```
+https://itunes.apple.com/search?term=whatsapp&entity=software
+```
+
+## Related Scrapers
+
+<CardGroup cols={2}>
+  <Card title="Google Play Scraper" icon="google" href="/api/scrapers/google-play">
+    Android app version scraping
+  </Card>
+  <Card title="Scraper Overview" icon="arrow-left" href="/api/scrapers/overview">
+    Back to architecture overview
+  </Card>
+</CardGroup>

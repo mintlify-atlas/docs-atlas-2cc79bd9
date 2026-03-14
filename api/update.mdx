@@ -1,0 +1,298 @@
+---
+title: 'POST /api/update'
+description: 'Trigger a refresh of app version data from all app stores'
+---
+
+## Overview
+
+The `/api/update` endpoint scrapes the latest version information from all configured app stores and updates the database. This endpoint includes rate limiting to prevent excessive scraping.
+
+## Request
+
+<ParamField query="method" type="string" default="POST">
+  HTTP method for this endpoint
+</ParamField>
+
+### Endpoint
+
+```
+POST /api/update
+```
+
+### Headers
+
+<ParamField header="x-admin-key" type="string" optional>
+  Admin secret key to bypass rate limiting. Set to `force` to skip the 60-minute cooldown period.
+  
+  **Important:** If this header is provided with an incorrect value (not `force`), the request will be rejected with a 401 error.
+</ParamField>
+
+## Rate Limiting
+
+By default, this endpoint enforces a **60-minute cooldown** between updates to prevent excessive scraping of app stores. 
+
+- Normal requests can only run once per hour
+- Admin requests with `x-admin-key: force` bypass this limit
+- Rate limit is tracked by the `lastUpdate` timestamp in the data
+
+## Response
+
+### Success Response
+
+<ResponseField name="success" type="boolean" required>
+  Indicates whether the update was successful
+</ResponseField>
+
+<ResponseField name="data" type="object" required>
+  The updated app version data (same structure as `/api/data` response)
+  
+  <Expandable title="Data Structure">
+    Contains `lastUpdate` timestamp and `apps` array with all version information.
+    
+    See the [GET /api/data](/api/data) endpoint documentation for the complete data structure.
+  </Expandable>
+</ResponseField>
+
+### Error Response
+
+<ResponseField name="success" type="boolean" required>
+  Will be `false` when an error occurs
+</ResponseField>
+
+<ResponseField name="error" type="string" required>
+  Error message describing what went wrong
+</ResponseField>
+
+## Examples
+
+### Normal Update Request
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://your-domain.com/api/update
+```
+
+```javascript JavaScript
+const response = await fetch('https://your-domain.com/api/update', {
+  method: 'POST'
+});
+
+const result = await response.json();
+
+if (result.success) {
+  console.log('Update successful!');
+  console.log('New data:', result.data);
+} else {
+  console.error('Update failed:', result.error);
+}
+```
+
+```typescript TypeScript
+interface UpdateResponse {
+  success: boolean;
+  data?: {
+    lastUpdate: string;
+    apps: Array<any>;
+  };
+  error?: string;
+}
+
+const response = await fetch('https://your-domain.com/api/update', {
+  method: 'POST'
+});
+
+const result: UpdateResponse = await response.json();
+
+if (result.success && result.data) {
+  console.log('Updated at:', result.data.lastUpdate);
+}
+```
+
+```python Python
+import requests
+
+response = requests.post('https://your-domain.com/api/update')
+result = response.json()
+
+if result['success']:
+    print('Update successful!')
+else:
+    print(f"Update failed: {result['error']}")
+```
+
+</CodeGroup>
+
+### Admin Bypass Request
+
+Use the `x-admin-key` header to bypass rate limiting:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://your-domain.com/api/update \
+  -H "x-admin-key: force"
+```
+
+```javascript JavaScript
+const response = await fetch('https://your-domain.com/api/update', {
+  method: 'POST',
+  headers: {
+    'x-admin-key': 'force'
+  }
+});
+
+const result = await response.json();
+console.log('Forced update:', result);
+```
+
+```typescript TypeScript
+const response = await fetch('https://your-domain.com/api/update', {
+  method: 'POST',
+  headers: {
+    'x-admin-key': 'force'
+  }
+});
+
+const result = await response.json();
+```
+
+```python Python
+import requests
+
+headers = {'x-admin-key': 'force'}
+response = requests.post(
+    'https://your-domain.com/api/update',
+    headers=headers
+)
+result = response.json()
+```
+
+</CodeGroup>
+
+## Response Examples
+
+### Success (200)
+
+```json
+{
+  "success": true,
+  "data": {
+    "lastUpdate": "2026-03-14T10:30:00.000Z",
+    "apps": [
+      {
+        "id": "mykids",
+        "name": "MyKids",
+        "orderId": 1,
+        "icon": "https://...",
+        "stores": [
+          {
+            "id": "google-play",
+            "name": "Google Play",
+            "version": "1.3.9",
+            "lastUpdateDate": "10/02/2026",
+            "url": "https://play.google.com/store/apps/details?id=es.kidsandus.mykids"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Rate Limited (429)
+
+Returned when attempting to update within the 60-minute cooldown period:
+
+```json
+{
+  "success": false,
+  "error": "Rate limit: Please wait 60 minutes between updates"
+}
+```
+
+### Invalid Admin Key (401)
+
+Returned when the `x-admin-key` header is provided but has an incorrect value:
+
+```json
+{
+  "success": false,
+  "error": "Invalid Admin Key"
+}
+```
+
+### Server Error (500)
+
+Returned when scraping or data processing fails:
+
+```json
+{
+  "success": false,
+  "error": "Failed to scrape app store: Network timeout"
+}
+```
+
+## Status Codes
+
+| Status Code | Description |
+|-------------|-------------|
+| 200 | Success - Data updated successfully |
+| 401 | Unauthorized - Invalid admin key provided |
+| 429 | Too Many Requests - Rate limit exceeded (60-minute cooldown) |
+| 500 | Internal Server Error - Scraping or processing failed |
+
+## Implementation Details
+
+### Rate Limiting Logic
+
+The endpoint checks the `lastUpdate` timestamp from the database:
+
+1. If `x-admin-key: force` is provided, skip rate check
+2. Calculate time difference: `current time - lastUpdate`
+3. If less than 60 minutes, return 429 error
+4. Otherwise, proceed with scraping
+
+See source at `src/app/api/update/route.ts:21-34`
+
+### Admin Bypass
+
+The admin key check is strict:
+- If the `x-admin-key` header is **not provided**: Normal rate limiting applies
+- If the header **is provided** with value `force`: Rate limiting is bypassed
+- If the header **is provided** with any other value: Request is rejected with 401
+
+See source at `src/app/api/update/route.ts:12-19`
+
+### Scraping Process
+
+The endpoint:
+1. Validates rate limiting (unless bypassed)
+2. Initializes the `ScraperService`
+3. Scrapes all configured apps from `APPS_CONFIG`
+4. Writes the new data to storage
+5. Returns the updated data
+
+Even if data persistence fails, the endpoint still returns the scraped data to the client.
+
+## Use Cases
+
+- Manual refresh of app version data
+- Scheduled updates via cron jobs
+- CI/CD pipeline integration for automated monitoring
+- Admin tools requiring immediate data refresh
+- Webhook triggers from deployment systems
+
+## Best Practices
+
+<Warning>
+  **Respect Rate Limits:** The 60-minute cooldown exists to prevent excessive load on app store servers. Only use admin bypass when absolutely necessary.
+</Warning>
+
+<Tip>
+  For automated monitoring, schedule updates at reasonable intervals (e.g., once per hour) and handle 429 responses gracefully.
+</Tip>
+
+<Note>
+  The admin key (`force`) should be kept secret and only used in trusted environments. Consider using environment variables to store it securely.
+</Note>

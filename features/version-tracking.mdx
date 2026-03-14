@@ -1,0 +1,198 @@
+---
+title: 'Version Tracking'
+description: 'Track app versions across multiple stores with real-time version comparison'
+icon: 'code-compare'
+---
+
+## Supported Stores
+
+The Kids&Us App Versions dashboard tracks applications across five major app distribution platforms:
+
+<CardGroup cols={2}>
+  <Card title="Google Play" icon="google-play">
+    Android app versions from the Google Play Store
+  </Card>
+  <Card title="App Store iOS" icon="app-store-ios">
+    iOS app versions from Apple's App Store
+  </Card>
+  <Card title="App Store macOS" icon="apple">
+    macOS app versions from Apple's Mac App Store
+  </Card>
+  <Card title="Microsoft Store" icon="microsoft">
+    Windows app versions from the Microsoft Store
+  </Card>
+  <Card title="Huawei AppGallery" icon="mobile">
+    Android app versions from Huawei's AppGallery
+  </Card>
+</CardGroup>
+
+## Tracked Information
+
+For each app and store combination, the dashboard displays:
+
+### Version Number
+
+The current version string as reported by the store:
+- Format varies by platform (e.g., `1.3.9`, `1.0042`, `10.2.9`)
+- Displayed in a monospace font for easy reading
+- Interactive badge that copies version to clipboard on click
+- Shows "N/A" if version information is unavailable
+
+### Last Update Date
+
+The date when the app was last updated on that specific store:
+- Format: `DD/MM/YYYY` (e.g., "10/02/2026")
+- Scraped directly from the store listing
+- Helps identify when versions were published
+
+### Store URLs
+
+Direct links to the app's store page:
+- Each store name is a clickable link
+- Opens in a new tab for easy reference
+- Links are constructed using the app's store-specific ID
+
+<Note>
+  Store data is fetched from live store pages, ensuring accuracy with official listings.
+</Note>
+
+## Version Comparison
+
+### Identifying Version Differences
+
+The dashboard makes it easy to spot version discrepancies across stores:
+
+<CodeGroup>
+```json Same Version Across Stores
+{
+  "name": "MyKids",
+  "stores": [
+    { "name": "Google Play", "version": "1.3.9" },
+    { "name": "App Store iOS", "version": "1.3.9" }
+  ]
+}
+```
+
+```json Different Versions
+{
+  "name": "Fairy Tales",
+  "stores": [
+    { "name": "Google Play", "version": "1.0042" },
+    { "name": "App Store iOS", "version": "1.2.0" },
+    { "name": "App Store macOS", "version": "1.2.0" }
+  ]
+}
+```
+</CodeGroup>
+
+In the example above, "Fairy Tales" has different versioning schemes:
+- Android stores (Google Play, AppGallery): `1.0042`
+- Apple stores (iOS, macOS): `1.2.0`
+
+<Tip>
+  Quickly scan version badges to identify which apps need updates. Different version numbers across stores indicate platform-specific releases.
+</Tip>
+
+## Version Badges
+
+### Interactive Badges
+
+Version numbers are displayed as clickable badges with several states:
+
+1. **Default State**
+   - Gray background (`secondary` variant)
+   - Monospace font for clarity
+   - Cursor changes to pointer on hover
+
+2. **Hover State**
+   - Background darkens slightly
+   - Indicates interactivity
+
+3. **Copied State**
+   - Background turns green
+   - Text changes to "Copied!" with checkmark icon
+   - Reverts after 1 second
+
+### Using Version Badges
+
+To copy a version number:
+1. Click on any version badge
+2. The badge will turn green and show "Copied!"
+3. The version number is now in your clipboard
+4. Paste anywhere you need it
+
+<Note>
+  Version copying uses the browser's Clipboard API for secure, reliable copying.
+</Note>
+
+## Real-World Example
+
+Here's how version tracking works with a real app from the dashboard:
+
+### P&P and B&B App
+
+This app is distributed across all five supported stores:
+
+| Store | Version | Last Update |
+|-------|---------|-------------|
+| Microsoft Store | 1.1.2 | 13/01/2026 |
+| Google Play | 1.1.2 | 09/01/2026 |
+| App Store iOS | 1.1.2 | 13/01/2026 |
+| App Store macOS | 1.1.2 | 13/01/2026 |
+| Huawei AppGallery | 1.1.2 | 13/01/2026 |
+
+**Observations:**
+- All stores have the same version (`1.1.2`)
+- Google Play was updated first (09/01/2026)
+- Other stores were updated 4 days later (13/01/2026)
+- This indicates a staggered rollout strategy
+
+### GRIP 2120 App
+
+Another example showing version differences:
+
+| Store | Version | Last Update |
+|-------|---------|-------------|
+| Google Play | 1.2.3 | 02/12/2025 |
+| App Store iOS | 1.2.1 | 03/12/2024 |
+
+**Observations:**
+- iOS version (`1.2.1`) is behind Android (`1.2.3`)
+- iOS version hasn't been updated in over a year
+- This could indicate iOS-specific development delays or separate release cycles
+
+<Tip>
+  Use the Last Update date to track how frequently each platform receives updates.
+</Tip>
+
+## Multi-Platform Strategy
+
+The dashboard supports apps with varying distribution strategies:
+
+### Limited Distribution
+
+Some apps are only available on certain platforms:
+- **MyKids**: Google Play + App Store iOS only
+- **MyLocker**: Google Play + App Store iOS only
+- **T&T Homed In**: Google Play + App Store iOS only
+
+### Full Distribution
+
+Other apps are available on all five platforms:
+- **P&P and B&B**: All stores
+- **Animal Planet**: All stores
+- **Fairy Tales**: All stores
+
+### Desktop Support
+
+Apps with macOS and Windows versions:
+- **P&P and B&B**: Has macOS and Windows versions
+- **Animal Planet**: Has macOS and Windows versions
+- **Fairy Tales**: Has macOS and Windows versions
+
+## Unavailable Versions
+
+When a version cannot be determined:
+- The badge is replaced with "N/A" in italic gray text
+- This can occur if the store page is inaccessible or the scraper encounters an error
+- Last Update date is still displayed when available

@@ -1,0 +1,281 @@
+---
+title: 'Google Play Scraper'
+description: 'HTML scraping implementation for extracting Android app version data from Google Play Store'
+icon: 'google'
+---
+
+## Overview
+
+The `GooglePlayScraper` extracts app version information from the Google Play Store by parsing HTML content. Unlike the App Store scraper, Google Play doesn't offer a public API, so this scraper uses pattern matching to extract data from the web page.
+
+**File Location**: `src/lib/scrapers/google-play.ts`
+
+<Warning>
+  HTML scraping is inherently fragile and may break if Google changes their page structure. The scraper uses multiple fallback patterns to improve reliability.
+</Warning>
+
+## Implementation
+
+```typescript src/lib/scrapers/google-play.ts
+import { IScraper, ScrapeResult, StoreConfig } from './types';
+import { parseGooglePlayDate } from '../utils/date';
+
+export class GooglePlayScraper implements IScraper {
+  async scrape(config: StoreConfig): Promise<ScrapeResult> {
+    const packageId = config.packageId;
+    if (!packageId) throw new Error('Missing packageId');
+
+    const url = `https://play.google.com/store/apps/details?id=${packageId}&hl=en`;
+    const response = await fetch(url);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const html = await response.text();
+    let version = 'N/A';
+    let lastUpdateDate = 'N/A';
+
+    // Extract update date
+    const updatedOnMatch = html.match(/>Updated on<[\s\S]{1,200}?>([\w\s,]+)</i);
+    if (updatedOnMatch && updatedOnMatch[1]) {
+      lastUpdateDate = parseGooglePlayDate(updatedOnMatch[1].trim());
+    }
+
+    // Extract version with multiple fallback patterns
+    const versionPatterns = [
+      /\[\[\["([\d.]+)"\]\],\[\[\[\d+\]\],\[\[\[\d+,"[\d.]+"\]\]\]\]\]/i,
+      /About this (?:app|game)[\s\S]{1,5000}?Version[\s\S]{1,300}?([\d.]+)/i,
+      /Version[\s<>"]+([0-9.]+)/i,
+      /"softwareVersion"\s*:\s*"([^"]+)"/i,
+    ];
+
+    for (const pattern of versionPatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        version = match[1];
+        break;
+      }
+    }
+
+    return {
+      version,
+      lastUpdateDate,
+      icon: '',
+    };
+  }
+}
+```
+
+## How It Works
+
+### 1. Configuration
+
+The scraper requires a `packageId` (Android package name) in the `StoreConfig`:
+
+```typescript
+const config: StoreConfig = {
+  id: 'android-app',
+  type: 'google-play',
+  packageId: 'com.whatsapp' // Required: Android package ID
+};
+```
+
+### 2. URL Construction
+
+The scraper builds a Google Play Store URL with English locale:
+
+```
+https://play.google.com/store/apps/details?id={packageId}&hl=en
+```
+
+**Example**: `https://play.google.com/store/apps/details?id=com.whatsapp&hl=en`
+
+<Info>
+  The `&hl=en` parameter forces English language, making regex patterns more consistent across regions.
+</Info>
+
+### 3. HTML Extraction
+
+The scraper fetches the entire HTML page and extracts two pieces of information:
+
+#### Update Date Extraction
+
+The update date is extracted using a regex pattern that looks for the "Updated on" label:
+
+```typescript
+const updatedOnMatch = html.match(/>Updated on<[\s\S]{1,200}?>([\w\s,]+)</i);
+if (updatedOnMatch && updatedOnMatch[1]) {
+  lastUpdateDate = parseGooglePlayDate(updatedOnMatch[1].trim());
+}
+```
+
+**Example HTML snippet**:
+```html
+<div>Updated on</div>
+<div>Jan 15, 2024</div>
+```
+
+**Extracted**: `"Jan 15, 2024"` → `"15/01/2024"` (after parsing)
+
+#### Version Extraction with Fallbacks
+
+The scraper uses **4 different regex patterns** to find the version, trying each in order until one matches:
+
+<Accordion title="Pattern 1: JSON-embedded version">
+  ```typescript
+  /\[\[\["([\d.]+)"\]\],\[\[\[\d+\]\],\[\[\[\d+,"[\d.]+"\]\]\]\]\]/i
+  ```
+  Matches version numbers embedded in JavaScript arrays within the HTML.
+  
+  **Example**: `[[["24.2.78"]],[[1]],[[[1,"24.2.78"]]]]`
+</Accordion>
+
+<Accordion title="Pattern 2: 'About this app/game' section">
+  ```typescript
+  /About this (?:app|game)[\s\S]{1,5000}?Version[\s\S]{1,300}?([\d.]+)/i
+  ```
+  Searches within the "About this app" section for version information.
+  
+  **Example**: `About this app ... Version 24.2.78 ...`
+</Accordion>
+
+<Accordion title="Pattern 3: Simple 'Version' label">
+  ```typescript
+  /Version[\s<>"]+([0-9.]+)/i
+  ```
+  Looks for the word "Version" followed by a number.
+  
+  **Example**: `Version<div>24.2.78</div>`
+</Accordion>
+
+<Accordion title="Pattern 4: Structured data (JSON-LD)">
+  ```typescript
+  /"softwareVersion"\s*:\s*"([^"]+)"/i
+  ```
+  Extracts from JSON-LD structured data sometimes embedded in the page.
+  
+  **Example**: `"softwareVersion": "24.2.78"`
+</Accordion>
+
+### 4. Date Parsing
+
+Google Play returns dates in various text formats that need to be parsed:
+
+```typescript
+parseGooglePlayDate("Jan 15, 2024") // → "15/01/2024"
+parseGooglePlayDate("December 5, 2023") // → "05/12/2023"
+```
+
+The `parseGooglePlayDate` utility function handles:
+- Full month names ("January", "February", etc.)
+- Abbreviated month names ("Jan", "Feb", etc.)
+- Various date formats
+
+## Error Handling
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Missing `packageId` | Throws `"Missing packageId"` |
+| HTTP error | Throws `"HTTP {status}"` |
+| Version not found | Returns `'N/A'` for version |
+| Date not found | Returns `'N/A'` for lastUpdateDate |
+| Icon not available | Returns empty string (Google Play scraping doesn't extract icons) |
+
+```typescript
+try {
+  const scraper = new GooglePlayScraper();
+  const result = await scraper.scrape({
+    id: 'whatsapp-android',
+    type: 'google-play',
+    packageId: 'com.whatsapp'
+  });
+  
+  console.log(result);
+  // { version: "2.24.2.78", lastUpdateDate: "15/01/2024", icon: "" }
+} catch (error) {
+  console.error('Scraping failed:', error.message);
+}
+```
+
+## Why No Icon Extraction?
+
+Unlike the App Store scraper, the Google Play scraper returns an empty string for the icon:
+
+```typescript
+return {
+  version,
+  lastUpdateDate,
+  icon: '', // Not extracted from HTML
+};
+```
+
+This is because:
+1. Icon URLs in Google Play HTML are often dynamically loaded or encoded
+2. The URLs may require authentication or have CORS restrictions
+3. The `ScraperService` can use icons from other stores (e.g., iTunes) as a fallback
+
+## Usage Example
+
+```typescript
+import { GooglePlayScraper } from './lib/scrapers/google-play';
+
+const scraper = new GooglePlayScraper();
+
+const result = await scraper.scrape({
+  id: 'whatsapp-android',
+  type: 'google-play',
+  packageId: 'com.whatsapp'
+});
+
+console.log(result);
+// {
+//   version: "2.24.2.78",
+//   lastUpdateDate: "15/01/2024",
+//   icon: ""
+// }
+```
+
+## Finding Package IDs
+
+Android package IDs can be found in the Google Play Store URL:
+
+```
+https://play.google.com/store/apps/details?id=com.whatsapp
+                                              ^^^^^^^^^^^^
+                                              Package ID
+```
+
+Or in the app's `AndroidManifest.xml`:
+
+```xml
+<manifest package="com.whatsapp" ...>
+```
+
+## Reliability Considerations
+
+<Warning>
+  **HTML scraping risks**:
+  - Google may change their HTML structure at any time
+  - Different regions may have different layouts
+  - Rate limiting may occur with too many requests
+  - Version patterns may not match all apps
+</Warning>
+
+**Mitigation strategies**:
+1. **Multiple patterns**: 4 different regex patterns increase success rate
+2. **Retry logic**: `ScraperService` retries failed requests 3 times
+3. **Graceful degradation**: Returns 'N/A' instead of crashing
+4. **English locale**: `hl=en` ensures consistent text patterns
+
+## Related Scrapers
+
+<CardGroup cols={2}>
+  <Card title="App Store Scraper" icon="apple" href="/api/scrapers/app-store">
+    API-based scraping for iOS apps
+  </Card>
+  <Card title="Microsoft Store Scraper" icon="microsoft" href="/api/scrapers/microsoft-store">
+    Windows app version scraping
+  </Card>
+  <Card title="Scraper Overview" icon="arrow-left" href="/api/scrapers/overview">
+    Back to architecture overview
+  </Card>
+</CardGroup>

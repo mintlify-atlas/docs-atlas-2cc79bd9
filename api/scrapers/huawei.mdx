@@ -1,0 +1,484 @@
+---
+title: 'Huawei AppGallery Scraper'
+description: 'Complex API integration for fetching app version data from Huawei AppGallery with authentication'
+icon: 'mobile'
+---
+
+## Overview
+
+The `HuaweiScraper` is the most complex scraper in the system. It fetches app version information from Huawei AppGallery using a multi-step authentication process that mimics browser behavior.
+
+**File Location**: `src/lib/scrapers/huawei.ts`
+
+<Warning>
+  This scraper requires a two-step authentication process and uses specific headers to bypass bot detection. It's more fragile than API-based scrapers.
+</Warning>
+
+## Implementation
+
+```typescript src/lib/scrapers/huawei.ts
+import { IScraper, ScrapeResult, StoreConfig } from './types';
+import { HuaweiResponseSchema } from '../schemas';
+
+export class HuaweiScraper implements IScraper {
+  async scrape(config: StoreConfig): Promise<ScrapeResult> {
+    const appId = config.appId;
+    if (!appId) throw new Error('Missing appId');
+
+    // Step 1: Generate a unique identity ID
+    const identityId = this.generateIdentityId();
+
+    // Step 2: Get interface code (JWT-like authentication)
+    const codeUrl = 'https://web-dre.hispace.dbankcloud.com/edge/webedge/getInterfaceCode';
+    const codeResponse = await fetch(codeUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Identity-Id': identityId,
+        Referer: 'https://appgallery.huawei.com/',
+        Origin: 'https://appgallery.huawei.com',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    if (!codeResponse.ok) throw new Error(`Failed to get interface code: ${codeResponse.status}`);
+
+    const jwtBase = await codeResponse.json();
+    if (typeof jwtBase !== 'string') {
+      throw new Error('Invalid Interface-Code response format');
+    }
+
+    // Step 3: Build time-based interface code
+    const interfaceCode = `${jwtBase}_${Date.now()}`;
+
+    // Step 4: Fetch app details with authentication headers
+    const apiUrl = `https://web-dre.hispace.dbankcloud.com/edge/uowap/index?method=internal.getTabDetail&serviceType=20&reqPageNum=1&maxResults=25&uri=app%7C${appId}&appid=${appId}&zone=&locale=es_ES`;
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        Accept: 'application/json, text/plain, */*',
+        'Identity-Id': identityId,
+        'Interface-Code': interfaceCode,
+        Referer: 'https://appgallery.huawei.com/',
+        Origin: 'https://appgallery.huawei.com',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status} fetching details`);
+
+    const json = await response.json();
+    const parsed = HuaweiResponseSchema.safeParse(json);
+
+    if (!parsed.success) {
+      console.error('Huawei API schema validation failed:', parsed.error);
+      throw new Error('Invalid Huawei API response structure');
+    }
+
+    const data = parsed.data;
+
+    let version = 'N/A';
+    let lastUpdateDate = 'N/A';
+    let icon = '';
+
+    // Extract data from layoutData structure
+    if (data.layoutData) {
+      for (const layout of data.layoutData) {
+        if (layout.dataList && layout.dataList.length > 0) {
+          const item = layout.dataList[0];
+          if (item.versionName || item.version) {
+            version = item.versionName || item.version || 'N/A';
+          }
+          if (item.releaseDate || item.updateTime) {
+            lastUpdateDate = item.releaseDate || item.updateTime || 'N/A';
+          }
+          if (item.icon && !icon) {
+            icon = item.icon;
+          }
+        }
+      }
+    }
+
+    if (version === 'N/A' && lastUpdateDate === 'N/A') {
+      throw new Error('Could not find app details in Huawei response structure');
+    }
+
+    return {
+      version,
+      lastUpdateDate: this.formatDate(lastUpdateDate),
+      icon,
+    };
+  }
+
+  private formatDate(dateStr: string): string {
+    if (!dateStr || dateStr === 'N/A') return dateStr;
+
+    // Huawei format is D/M/YYYY (e.g., 1/1/2026 or 13/1/2026)
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return `${day}/${month}/${year}`;
+    }
+
+    return dateStr;
+  }
+
+  private generateIdentityId(): string {
+    // Generate a dashless UUID v4
+    return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+}
+```
+
+## How It Works
+
+### 1. Configuration
+
+The scraper requires an `appId` (Huawei's app identifier) in the `StoreConfig`:
+
+```typescript
+const config: StoreConfig = {
+  id: 'huawei-app',
+  type: 'huawei',
+  appId: 'C123456789' // Required: Huawei app ID
+};
+```
+
+### 2. Four-Step Authentication Process
+
+Unlike other scrapers, the Huawei scraper requires a complex authentication flow:
+
+<Steps>
+  <Step title="Generate Identity ID">
+    Create a unique dashless UUID v4 to identify this "browser session"
+    
+    ```typescript
+    const identityId = this.generateIdentityId();
+    // Example: "a1b2c3d4e5f64g7h8i9j0k1l2m3n4o5p6"
+    ```
+  </Step>
+  
+  <Step title="Request Interface Code">
+    POST to the authentication endpoint to get a JWT-like token
+    
+    ```typescript
+    const codeResponse = await fetch(
+      'https://web-dre.hispace.dbankcloud.com/edge/webedge/getInterfaceCode',
+      {
+        method: 'POST',
+        headers: {
+          'Identity-Id': identityId,
+          // ... other browser-like headers
+        }
+      }
+    );
+    
+    const jwtBase = await codeResponse.json();
+    // Example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    ```
+  </Step>
+  
+  <Step title="Build Time-Based Code">
+    Combine the JWT token with current timestamp
+    
+    ```typescript
+    const interfaceCode = `${jwtBase}_${Date.now()}`;
+    // Example: "eyJhbGciOi...XVCJp_1705320000000"
+    ```
+  </Step>
+  
+  <Step title="Fetch App Details">
+    Make the actual API request with both authentication headers
+    
+    ```typescript
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Identity-Id': identityId,
+        'Interface-Code': interfaceCode,
+        // ... other headers
+      }
+    });
+    ```
+  </Step>
+</Steps>
+
+### 3. Identity ID Generation
+
+The scraper generates a dashless UUID v4 (32 hexadecimal characters) to simulate a browser session:
+
+```typescript src/lib/scrapers/huawei.ts:106-113
+private generateIdentityId(): string {
+  // Generate a dashless UUID v4
+  return 'xxxxxxxxxxxx4xxxyxxxxxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+```
+
+**Example output**: `a7f3e4d2c1b645a89f8e7d6c5b4a3219`
+
+### 4. API Endpoint
+
+The app details endpoint uses query parameters:
+
+```
+https://web-dre.hispace.dbankcloud.com/edge/uowap/index
+  ?method=internal.getTabDetail
+  &serviceType=20
+  &reqPageNum=1
+  &maxResults=25
+  &uri=app%7C{appId}
+  &appid={appId}
+  &zone=
+  &locale=es_ES
+```
+
+**Key parameters**:
+- `method=internal.getTabDetail`: API method name
+- `uri=app%7C{appId}`: Encoded app URI (`app|{appId}`)
+- `appid={appId}`: App identifier
+- `locale=es_ES`: Spanish locale
+
+### 5. Required Headers
+
+The scraper must send specific headers to avoid bot detection:
+
+```typescript
+headers: {
+  'Accept': 'application/json, text/plain, */*',
+  'Identity-Id': identityId,           // Session identifier
+  'Interface-Code': interfaceCode,      // Time-based auth token
+  'Referer': 'https://appgallery.huawei.com/',
+  'Origin': 'https://appgallery.huawei.com',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...'
+}
+```
+
+<Warning>
+  All headers are required. Missing `Identity-Id`, `Interface-Code`, or `Referer` will result in 403 Forbidden errors.
+</Warning>
+
+### 6. Response Structure
+
+Huawei's API returns a complex nested structure:
+
+```json
+{
+  "layoutData": [
+    {
+      "dataList": [
+        {
+          "versionName": "2.24.2.78",
+          "version": "2.24.2.78",
+          "releaseDate": "15/1/2024",
+          "updateTime": "15/1/2024",
+          "icon": "https://appimg.huawei.com/...",
+          "name": "WhatsApp",
+          // ... many other fields
+        }
+      ],
+      "layoutType": "app_detail"
+    },
+    // ... more layout sections
+  ]
+}
+```
+
+### 7. Schema Validation
+
+```typescript src/lib/schemas.ts
+export const HuaweiResponseSchema = z.object({
+  layoutData: z
+    .array(
+      z.object({
+        dataList: z
+          .array(
+            z.object({
+              versionName: z.string().optional(),
+              version: z.string().optional(),
+              releaseDate: z.string().optional(),
+              updateTime: z.string().optional(),
+              icon: z.string().optional(),
+            })
+          )
+          .optional(),
+      })
+    )
+    .optional(),
+});
+```
+
+### 8. Data Extraction
+
+The scraper iterates through the `layoutData` array to find app information:
+
+```typescript src/lib/scrapers/huawei.ts:63-78
+if (data.layoutData) {
+  for (const layout of data.layoutData) {
+    if (layout.dataList && layout.dataList.length > 0) {
+      const item = layout.dataList[0];
+      
+      // Version with fallback
+      if (item.versionName || item.version) {
+        version = item.versionName || item.version || 'N/A';
+      }
+      
+      // Date with fallback
+      if (item.releaseDate || item.updateTime) {
+        lastUpdateDate = item.releaseDate || item.updateTime || 'N/A';
+      }
+      
+      // Icon
+      if (item.icon && !icon) {
+        icon = item.icon;
+      }
+    }
+  }
+}
+```
+
+**Field priority**:
+- Version: `versionName` > `version`
+- Date: `releaseDate` > `updateTime`
+
+## Date Formatting
+
+Huawei returns dates in `D/M/YYYY` format which needs padding:
+
+```typescript src/lib/scrapers/huawei.ts:91-104
+private formatDate(dateStr: string): string {
+  if (!dateStr || dateStr === 'N/A') return dateStr;
+
+  // Huawei format is D/M/YYYY (e.g., 1/1/2026 or 13/1/2026)
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const day = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year = parts[2];
+    return `${day}/${month}/${year}`;
+  }
+
+  return dateStr;
+}
+```
+
+**Examples**:
+- `"1/1/2026"` → `"01/01/2026"`
+- `"15/3/2024"` → `"15/03/2024"`
+- `"31/12/2023"` → `"31/12/2023"`
+
+## Error Handling
+
+| Error Condition | Behavior |
+|----------------|----------|
+| Missing `appId` | Throws `"Missing appId"` |
+| Interface code request fails | Throws `"Failed to get interface code: {status}"` |
+| Invalid interface code format | Throws `"Invalid Interface-Code response format"` |
+| App details request fails | Throws `"HTTP {status} fetching details"` |
+| Invalid schema | Logs error and throws `"Invalid Huawei API response structure"` |
+| No data found | Throws `"Could not find app details in Huawei response structure"` |
+
+```typescript
+try {
+  const scraper = new HuaweiScraper();
+  const result = await scraper.scrape({
+    id: 'whatsapp-huawei',
+    type: 'huawei',
+    appId: 'C123456789'
+  });
+  
+  console.log(result);
+  // { 
+  //   version: "2.24.2.78", 
+  //   lastUpdateDate: "15/01/2024", 
+  //   icon: "https://appimg.huawei.com/..." 
+  // }
+} catch (error) {
+  console.error('Scraping failed:', error.message);
+}
+```
+
+## Usage Example
+
+```typescript
+import { HuaweiScraper } from './lib/scrapers/huawei';
+
+const scraper = new HuaweiScraper();
+
+// Complete authentication flow and scrape
+const result = await scraper.scrape({
+  id: 'whatsapp-huawei',
+  type: 'huawei',
+  appId: 'C123456789'
+});
+
+console.log(result);
+// {
+//   version: "2.24.2.78",
+//   lastUpdateDate: "15/01/2024",
+//   icon: "https://appimg.huawei.com/content/..."
+// }
+```
+
+## Finding Huawei App IDs
+
+Huawei app IDs can be found in the AppGallery URL:
+
+```
+https://appgallery.huawei.com/app/C123456789
+                                  ^^^^^^^^^^^
+                                  App ID
+```
+
+**App ID format**: Typically starts with `C` followed by 9-10 digits.
+
+## Why So Complex?
+
+The Huawei scraper is the most complex because:
+
+1. **Bot Protection**: Huawei uses anti-bot measures requiring browser-like headers
+2. **Two-Step Auth**: Requires both `Identity-Id` and time-based `Interface-Code`
+3. **Session Simulation**: Must generate unique session identifiers
+4. **Nested Structure**: Response data is deeply nested in `layoutData` arrays
+5. **Field Variations**: Multiple possible field names for the same data
+
+## Reliability Considerations
+
+<Warning>
+  **Potential failure points**:
+  - Huawei may change authentication requirements
+  - Interface code generation algorithm may change
+  - Response structure may evolve
+  - Rate limiting may occur
+  - Geographic restrictions may apply
+</Warning>
+
+**Mitigation strategies**:
+1. **Retry logic**: `ScraperService` retries 3 times
+2. **Field fallbacks**: Checks multiple fields (`versionName` / `version`)
+3. **Graceful degradation**: Returns 'N/A' on failure
+4. **Schema validation**: Detects structure changes early
+
+## Related Scrapers
+
+<CardGroup cols={2}>
+  <Card title="Microsoft Store Scraper" icon="microsoft" href="/api/scrapers/microsoft-store">
+    Simpler API-based scraping
+  </Card>
+  <Card title="Google Play Scraper" icon="google" href="/api/scrapers/google-play">
+    HTML scraping approach
+  </Card>
+  <Card title="Scraper Overview" icon="arrow-left" href="/api/scrapers/overview">
+    Back to architecture overview
+  </Card>
+</CardGroup>
